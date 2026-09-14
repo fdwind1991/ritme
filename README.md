@@ -48,22 +48,6 @@ The interface deliberately stays minimal. Advanced functionality only appears wh
 
 ---
 
-## Screenshots
-
-_Add screenshots here._
-
-Suggested:
-
-```text
-screenshots/
-├── typing.png
-├── results.png
-├── practice.png
-└── progress.png
-```
-
----
-
 ## Run locally
 
 Ritme uses plain HTML, CSS and JavaScript.
