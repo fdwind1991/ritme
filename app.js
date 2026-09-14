@@ -1,7 +1,7 @@
 /* Ritme · application logic. GPL-3.0; see LICENSE. Load data.js first. */
 'use strict';
 // Fail visibly on incomplete/mixed deployments instead of exposing raw i18n keys.
-const APP_RELEASE = '3.2.1';
+const APP_RELEASE = '3.2.2';
 if (typeof RITME_DATA === 'undefined' || RITME_DATA.release !== APP_RELEASE ||
     !RITME_DATA.codeCorpora?.python || !RITME_DATA.expandedLexicons?.nl ||
     !RITME_DATA.messages?.['code.label']?.nl) {
@@ -126,7 +126,7 @@ function applyInterface(){
   // Translate whole help paragraphs before their leaf labels, preserving inline markup.
   document.querySelectorAll('[data-i18n-html]').forEach(el=>{el.innerHTML=translate(el.dataset.i18nHtml);});
   document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent=translate(el.dataset.i18n);});
-  for(const attr of ['title','aria-label','placeholder']){
+  for(const attr of ['title','aria-label','placeholder','label']){
     document.querySelectorAll('[data-i18n-'+attr+']').forEach(el=>el.setAttribute(attr,translate(el.getAttribute('data-i18n-'+attr))));
   }
   $('ui-language').value=settings.uiLanguage;
@@ -475,6 +475,7 @@ function updateControls(){
   $('code-settings').hidden=!isCodeMode;
   $('code-language').value=settings.codeLanguage;$('code-language').disabled=running;
   $('code-btn').disabled=running;
+  $('code-tutorial-btn').hidden=!isCodeMode;$('code-tutorial-btn').disabled=running;
   $('practice-infinite-note').hidden=!infinite;
   document.querySelectorAll('[data-duration]').forEach(b=>{b.setAttribute('aria-pressed',String(b.dataset.duration==='infinite'?infinite:!infinite&&Number(b.dataset.duration)===(standard?60:settings.duration)));b.disabled=running||standard;if(b.dataset.duration!=='infinite')b.hidden=standard&&b.dataset.duration!=='60';});
   $('stop-btn').dataset.i18nTitle=infinite?'practice.infinite.stop':'Afronden met de verstreken tijd';
@@ -484,8 +485,8 @@ function updateControls(){
   if(infinite)$('timer').setAttribute('aria-label',translate('practice.infinite.elapsed'));else $('timer').removeAttribute('aria-label');
   $('language').value=standard?settings.standardLanguage:settings.language;$('language').disabled=running;
   const random=$('language').querySelector('[value="random"]');if(random){random.hidden=standard;random.disabled=standard;}
-  $('word-activity').value=standard?'standard':isPractice?'practice':'free';$('word-activity').dataset.active=String(standard||isPractice);
-  $('word-activity').style.width=Math.min(162,Math.max(76,$('word-activity').selectedOptions[0].textContent.length*6.6+24))+'px';
+  $('word-activity').value=standard?'standard':isPractice?(settings.practiceLesson==='adaptive'?'practice':'practice:'+settings.practiceLesson):'free';
+  $('word-activity').dataset.active=String(standard||isPractice);
   $('word-activity-wrap').hidden=isNumbers||isCustom||isCodeMode;
   $('keyboard-layout').value=settings.keyboardLayout;$('keyboard-layout').disabled=running;
   $('words-btn').setAttribute('aria-pressed',String(mode==='words'||isPractice));
@@ -498,7 +499,16 @@ function updateControls(){
   $('capitalization-hint').textContent=translate(settings.punctuation?'capitals.hint.punctuation':'capitals.hint.random');
   for(const id of ['words-btn','numbers-btn','word-activity','punctuation-btn','capitals-btn','mix-numbers-btn','custom-btn','number-length','number-keyboard'])$(id).disabled=running;
   $('language-wrap').hidden=isNumbers||isDrill||isCodeMode;$('number-settings').hidden=!isNumbers;$('number-length').value=settings.numberLength;$('number-keyboard').value=settings.numberKeyboard;
-  $('mix-numbers-btn').hidden=standard||isNumbers||isCustom||isCodeMode||isDrill||isAdaptive(session?.config);$('punctuation-btn').hidden=standard||isNumbers||isCustom||isCodeMode||isDrill;
+  // Practice-only options live under information; Free typing always exposes +123.
+  const optionsInPractice=isPractice&&!isDrill;
+  const optionHost=$(optionsInPractice?'practice-word-options':'word-options');
+  for(const id of ['mix-numbers-btn','punctuation-btn','capitals-btn']){
+    const control=$(id);if(control.parentElement!==optionHost)optionHost.append(control);
+  }
+  $('mix-numbers-btn').hidden=standard||isNumbers||isCustom||isCodeMode||isDrill||(isPractice&&isAdaptive(session?.config));
+  $('punctuation-btn').hidden=standard||isNumbers||isCustom||isCodeMode||isDrill;
+  $('word-options').hidden=mode!=='words'||standard;
+  $('test-info-word-options').hidden=!optionsInPractice;
   const notes=[];
   if(!standard&&settings.language==='random'&&session&&!isNumbers&&!isDrill&&!isCodeMode)notes.push(resultLanguage(session.config));
 
@@ -514,7 +524,11 @@ function updateControls(){
 }
 function createWordNode(word){
   const el=document.createElement('span');el.className='word'+(isCode(session?.config)?' code-line':'');
-  if(isCode(session?.config))el.dataset.line=String(word.lineNumber);
+  if(isCode(session?.config)){
+    el.dataset.line=String(word.lineNumber);
+    const number=document.createElement('span');number.className='code-line-number';
+    number.textContent=String(word.lineNumber);number.setAttribute('aria-hidden','true');el.append(number);
+  }
   const chars=word.chars.map(ch=>{const s=document.createElement('span');s.className='char';s.textContent=ch;if(ch===' ')s.dataset.space='true';setFingerStyle(s,ch);el.append(s);return s;});
   const extras=document.createElement('span');extras.className='extras';el.append(extras);
   const gap=document.createElement('span');gap.className='gap';gap.textContent=isCode(session?.config)?'↵':' ';setFingerStyle(gap,isCode(session?.config)?'\n':' ');el.append(gap);
@@ -539,12 +553,33 @@ function renderWord(index){
   for(const p of w.input.slice(w.chars.length)){const s=document.createElement('span');s.className='extra';s.textContent=p.ch;n.extras.append(s);}
   n.gap.className='gap'+(w.submitted?(w.space?.good?' correct':' incorrect'):'')+(index===session.index && w.input.length>=w.chars.length?' current':'');
 }
+function syncCodeViewport(){
+  const viewport=$('typing-viewport');
+  if(!isCode(session?.config)){viewport.style.removeProperty('--code-viewport-height');return;}
+  // The visual viewport shrinks for a phone's software keyboard, not only resize.
+  const visual=window.visualViewport,rect=viewport.getBoundingClientRect();
+  const bottom=(visual?.offsetTop||0)+(visual?.height||window.innerHeight);
+  viewport.style.setProperty('--code-viewport-height',Math.max(100,Math.min(330,bottom-rect.top-16))+'px');
+}
 function scrollToCaret(){
   const node=nodes[session?.index];if(!node)return;
-  const lh=parseFloat(getComputedStyle($('typing-viewport')).lineHeight);
-  const caret=isCode(session?.config)?node.el.querySelector('.current'):null;
-  const offset=Math.max(0,(caret?caret.getBoundingClientRect().top-$('word-track').getBoundingClientRect().top:node.el.offsetTop)-lh);
-  $('word-track').style.setProperty('--scroll-y',-offset+'px');
+  const viewport=$('typing-viewport'),track=$('word-track'),code=isCode(session?.config);
+  syncCodeViewport();
+  const lh=parseFloat(getComputedStyle(viewport).lineHeight);
+  const caret=code?node.el.querySelector('.current'):null;
+  const offset=Math.max(0,(caret?caret.getBoundingClientRect().top-track.getBoundingClientRect().top:node.el.offsetTop)-lh);
+  track.style.setProperty('--scroll-y',-offset+'px');
+  if(caret){
+    const bounds=viewport.getBoundingClientRect(),box=caret.getBoundingClientRect();
+    const gutter=node.el.querySelector('.code-line-number')?.offsetWidth||36;
+    // Native horizontal scrolling: source lines never visually become new lines.
+    if(box.right>bounds.right-12)viewport.scrollLeft+=box.right-bounds.right+12;
+    else if(box.left<bounds.left+gutter+8)viewport.scrollLeft=Math.max(0,viewport.scrollLeft+box.left-bounds.left-gutter-8);
+    if(session.current.input.length===0)viewport.scrollLeft=0;
+    // Anchor the native input close to the visible line for mobile focus handling.
+    $('capture').style.top=Math.min(viewport.clientHeight-20,Math.max(0,node.el.offsetTop-offset))+'px';
+    $('capture').style.left=Math.min(viewport.clientWidth-20,Math.max(0,gutter+8))+'px';
+  }
 }
 function focusTyping(){if(!$('test-view').hidden && !document.querySelector('dialog[open]'))$('capture').focus({preventScroll:true});}
 function newTest(){
@@ -552,6 +587,7 @@ function newTest(){
   clearInterval(timerHandle);timerHandle=null;document.body.classList.remove('running');
   setView('test');$('focus-overlay').hidden=true;$('caps-warning').hidden=true;
   $('fatal-error').hidden=true;currentResult=null;$('capture').value='';
+  $('typing-viewport').scrollLeft=0;$('capture').style.top='0px';$('capture').style.left='0px';
   $('word-track').replaceChildren();$('word-track').style.setProperty('--scroll-y','0px');nodes=[];
   $('test-time-fill').style.transform='scaleX(0)';
   try{
@@ -1435,15 +1471,12 @@ function renderCoach(){
  document.body.classList.toggle('numpad-active',numpad);
  document.body.classList.toggle('practice-active',enabled);
  document.body.classList.toggle('practice-colors',enabled&&settings.practiceColors);
- $('practice-settings').hidden=!enabled;$('practice-guide').hidden=!enabled;
- $('practice-lesson').closest('label').hidden=mode!=='practice';
+ $('test-info-visuals').hidden=!enabled;$('practice-guide').hidden=!enabled;
  for(const [id,key] of [['practice-guide',numpad?'numpad.guide':'practice.guide'],['coach-layout',numpad?'numpad.layout':'practice.layout'],['coach-homehint',numpad?'numpad.homehint':'practice.homehint'],['coach-legend-note',numpad?'numpad.legend.note':'practice.legend.note']]){
    const el=$(id);if(id==='practice-guide'){el.dataset.i18nAriaLabel=key;el.setAttribute('aria-label',translate(key));}else{el.dataset.i18n=key;el.textContent=translate(key);}
  }
- $('practice-lesson').value=settings.practiceLesson;
- $('practice-lesson').disabled=!!session?.running;
  const availableWeak=settings.practiceKeys||[],weak=$('practice-weak-option');weak.hidden=!availableWeak.length;weak.disabled=!availableWeak.length;
- if(availableWeak.length)weak.textContent=translate('practice.lesson.weak')+' · '+availableWeak.join(' / ');
+ weak.textContent=translate('activity.lesson.weak');
  for(const [id,key] of [['practice-keyboard-btn','practiceKeyboard'],['practice-colors-btn','practiceColors']])$(id).setAttribute('aria-pressed',String(settings[key]));
  $('coach-keyboard-wrap').hidden=!settings.practiceKeyboard;
  $('coach-target').hidden=!(settings.practiceKeyboard||settings.practiceColors);
@@ -1457,7 +1490,6 @@ function renderCoach(){
    $('practice-guide').setAttribute('aria-label',translate('layout.guide',{layout:layoutLabel(session?.config)}));
  }
  updateAdaptiveInfo();
- if(!session?.running)$('practice-lesson').style.width=Math.min(215,Math.max(95,($('practice-lesson').selectedOptions[0]?.textContent.length||12)*6.6+24))+'px';
  if(enabled)updateCoachTarget();
 }
 function expectedPracticeChar(){const w=session?.current;return w?(w.chars[w.input.length]??(isCode(session?.config)?'\n':' ')):null;}
@@ -1514,7 +1546,7 @@ function togglePracticeVisual(key){
  if(session?.config.mode==='practice')session.config.practiceAided=session.running?!!(session.config.practiceAided||settings.practiceKeyboard||settings.practiceColors):!!(settings.practiceKeyboard||settings.practiceColors);
  if(isCode(session?.config))session.config.codeAided=session.running?!!(session.config.codeAided||(settings.codeGuide&&(settings.practiceKeyboard||settings.practiceColors))):!!(settings.codeGuide&&(settings.practiceKeyboard||settings.practiceColors));
  if(isNumpad(session?.config))session.config.numberAided=session.running?!!(session.config.numberAided||settings.practiceKeyboard||settings.practiceColors):!!(settings.practiceKeyboard||settings.practiceColors);
- renderCoach();renderTestInfo();updatePersonalBest();focusTyping();
+ renderCoach();renderTestInfo();updatePersonalBest();if($('test-info-panel').hidden)focusTyping();
 }
 function startPractice(){settings.standardTest=false;mode='practice';practiceKeys=[...(settings.practiceKeys||[])];if(settings.practiceLesson==='weak'&&!practiceKeys.length)settings.practiceLesson='words';newTest();}
 function printFingerCard(){
@@ -1610,7 +1642,8 @@ function updateAdaptiveInfo(){
  const focus=session.config.adaptiveFocus||[],plan=adaptivePlan(session.config,session);
  $('adaptive-status').textContent=focus.length?translate('adaptive.focus',{keys:focus.join(' · ')}):translate('adaptive.cold');
  $('adaptive-detail').textContent=translate('adaptive.detail',{count:plan.tests});
- const opt=$('practice-adaptive-option');opt.textContent=translate('practice.lesson.adaptive')+(focus.length?' · '+focus.join(' / '):'');
+ // Keep the activity selector short; changing focus is already shown under information.
+ $('practice-adaptive-option').textContent=translate('activity.lesson.adaptive');
 }
 
 /* ============================== Event bindings ============================= */
@@ -1706,6 +1739,7 @@ $('capture').addEventListener('keydown',event=>{
 $('capture').addEventListener('keyup',event=>{let code=(event.code||'').replace(/[^a-zA-Z0-9]/g,'');if(isNumpad(session?.config)&&['Space','Enter'].includes(code))code='NumpadEnter';$('coach-keyboard').querySelector(`[data-code="${code}"]`)?.classList.remove('kb-down');});
 $('capture').addEventListener('blur',clearCoachKeys);
 $('capture').addEventListener('beforeinput',event=>{
+  if(composing||event.isComposing||!event.cancelable)return;
   if(['insertFromPaste','insertFromDrop','insertReplacementText'].includes(event.inputType)){event.preventDefault();toast(translate("Typ de tekst zelf; plakken en automatische vervanging zijn uitgeschakeld."));return;}
   if(event.inputType==='deleteContentBackward'){event.preventDefault();eraseInput();}
   if(event.inputType==='deleteWordBackward'){event.preventDefault();eraseInput(true);}
@@ -1715,7 +1749,15 @@ $('capture').addEventListener('paste',event=>{event.preventDefault();toast(trans
 $('capture').addEventListener('drop',event=>event.preventDefault());
 $('capture').addEventListener('compositionstart',()=>{composing=true;});
 $('capture').addEventListener('compositionend',()=>{composing=false;const text=$('capture').value;$('capture').value='';if(text)insertText(text);});
-$('capture').addEventListener('input',event=>{if(composing||event.isComposing)return;const text=$('capture').value;$('capture').value='';if(text)insertText(text);});
+$('capture').addEventListener('input',event=>{
+  if(composing||event.isComposing)return;
+  const text=$('capture').value;$('capture').value='';
+  if(['insertFromPaste','insertFromDrop','insertReplacementText'].includes(event.inputType))return;
+  if(event.inputType==='deleteContentBackward'){eraseInput();return;}
+  if(event.inputType==='deleteWordBackward'){eraseInput(true);return;}
+  if(text)insertText(text);
+  else if(event.inputType==='insertLineBreak'||event.inputType==='insertParagraph')insertText(isCode(session?.config)?'\n':' ');
+});
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'){
     if(event.target===$('ui-language'))return;
@@ -1754,8 +1796,12 @@ $('ui-language').addEventListener('change',()=>setInterfaceLanguage($('ui-langua
 $('word-activity').onchange=()=>{
  if(session?.running)return;
  const activity=$('word-activity').value;
- settings.standardTest=activity==='standard';settings.wordPractice=activity==='practice';
- if(activity==='practice')startPractice();else{mode='words';practiceKeys=[];newTest();}
+ const practice=activity==='practice'||activity.startsWith('practice:');
+ const lesson=activity==='practice'?'adaptive':activity.split(':')[1];
+ if(practice&&!['adaptive','words','home','top','bottom','letters','shift','digits','weak'].includes(lesson))return;
+ settings.standardTest=activity==='standard';settings.wordPractice=practice;
+ if(practice){settings.practiceLesson=lesson;startPractice();}
+ else{mode='words';practiceKeys=[];newTest();}
  persistSettings();
 };
 $('keyboard-layout').onchange=()=>{
@@ -1765,7 +1811,6 @@ $('keyboard-layout').onchange=()=>{
 };
 $('speed-unit').onchange=()=>{if(['wpm','cpm','kph'].includes($('speed-unit').value)){settings.speedUnit=$('speed-unit').value;persistSettings();renderHistory();}};
 
-$('practice-lesson').onchange=()=>{settings.practiceLesson=$('practice-lesson').value;practiceKeys=settings.practiceLesson==='weak'?[...(settings.practiceKeys||[])]:[];persistSettings();newTest();};
 $('practice-keyboard-btn').onclick=()=>togglePracticeVisual('practiceKeyboard');
 $('practice-colors-btn').onclick=()=>togglePracticeVisual('practiceColors');
 $('coach-keyboard').onclick=focusTyping;
@@ -1857,6 +1902,18 @@ document.addEventListener('focusin',event=>{
   if(!$('test-info-panel').contains(event.target)&&!$('test-info-btn').contains(event.target))closeTestInfo();
 });
 window.addEventListener('scroll',()=>{if(!$('test-info-panel').hidden)positionTestInfo();},{passive:true});
-window.visualViewport?.addEventListener('resize',()=>{if(!$('test-info-panel').hidden)positionTestInfo();});
+window.visualViewport?.addEventListener('resize',()=>{
+  if(!$('test-info-panel').hidden)positionTestInfo();
+  if(!$('test-view').hidden)requestAnimationFrame(scrollToCaret);
+});
+
+
+// An on-demand reading tutorial. Opening/closing it never creates a test result.
+$('code-tutorial-btn').onclick=()=>{
+  if(!isCode(session?.config)||session.running)return;
+  $('code-tutorial-example').textContent=session.words.slice(0,3).map(w=>w.text.replaceAll(' ','·')+'↵').join('\n');
+  openDialog('code-tutorial-dialog');
+  $('code-tutorial-dialog').scrollTop=0;
+};
 
 applyInterface();newTest();
