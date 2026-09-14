@@ -97,7 +97,6 @@ You can also open `index.html` directly, although a local web server provides mo
 ├── LICENSE
 ├── THIRD_PARTY_NOTICES.md
 ├── README.md
-└── .nojekyll
 ```
 
 ### `index.html`
