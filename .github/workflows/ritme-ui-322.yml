@@ -1,0 +1,104 @@
+name: Verify Ritme 3.2.2 mobile controls
+on:
+  push:
+    branches: [ritme-ui-3-2-2]
+permissions:
+  contents: write
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      verified_sha: ${{ steps.prepare.outputs.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Apply exact locally tested patch
+        shell: python
+        run: |
+          from pathlib import Path
+          import base64,zlib,hashlib,subprocess
+          encoded=''.join(p.read_text().strip() for p in sorted(Path('.ritme-transfer').glob('*.b64')))
+          patch=zlib.decompress(base64.b64decode(encoded,validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='005b26409bd6366dd767a8f60f8552f043e403e893da3b00e4ee840988c9c275'
+          subprocess.run(['git','apply','--unidiff-zero','--check','-'],input=patch,check=True)
+          subprocess.run(['git','apply','--unidiff-zero','-'],input=patch,check=True)
+          expected={
+            'app.js':'7b9caedee2270757fd302220e244f9cca6e5d96ec6ac0c598db7ecebe6718994',
+            'data.js':'5a2d1250bbddf862e63ed12279ad57d8db435123682fd74b59f034e2711e7c4e',
+            'index.html':'9a61d63731bcc98ff9fb7808d947d6fef7f2e7af76dcdc2c1f7b69f3323475cf',
+            'styles.css':'bcd226204b46939d3d9279729d36badecc1058675a08375d7fc11d23db365f0a',
+            'tests/mobile-ui.py':'5a07a0ac0b96a59a0cc0c11bbee5e5006c36dbd3ed0c5acea9b859f57ddb4291',
+            'tests/mobile-controls.test.cjs':'4d1d247e25ec5a3b7aff18ce46dfbe4e8a7baa4597dfb38319cd18c596b5f7f8'}
+          for name,digest in expected.items():
+            assert hashlib.sha256(Path(name).read_bytes()).hexdigest()==digest,name
+            print('VERIFIED_FILE',name,digest)
+      - name: Syntax and engine regressions
+        run: |
+          node --check app.js
+          node --check data.js
+          node --test tests/*.test.cjs
+      - name: Install browser test driver
+        run: python -m pip install playwright==1.57.0
+      - name: Test real local-server UI and browser storage
+        env:
+          RITME_CHECKS_DIR: ${{ runner.temp }}/ritme-ui-checks
+        run: |
+          BROWSER=$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)
+          if [ -z "$BROWSER" ]; then
+            python -m playwright install --with-deps chromium
+            BROWSER=$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')
+          fi
+          export CHROMIUM_PATH="$BROWSER"
+          python tests/mobile-ui.py
+          python tests/browser-fixture.py
+      - name: Prepare clean verified source tree
+        id: prepare
+        run: |
+          git rm -r .ritme-transfer .github/workflows/ritme-ui-322.yml
+          git add app.js data.js index.html styles.css tests/mobile-ui.py tests/mobile-controls.test.cjs
+          git config user.name 'Ritme maintenance'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Verify code lines, tutorial and compact word practice controls'
+          git push origin HEAD:ritme-ui-3-2-2
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "VERIFIED_TREE=$(git rev-parse 'HEAD^{tree}')"
+  public-assets:
+    needs: stage
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.stage.outputs.verified_sha }}
+      - name: Verify matching public assets after publication
+        shell: python
+        run: |
+          from pathlib import Path
+          import urllib.request,urllib.parse,re,time,hashlib
+          base='https://fdwind1991.github.io/ritme/'
+          expected=Path('index.html').read_bytes()
+          for attempt in range(90):
+            try:
+              request=urllib.request.Request(base+'?v=3.2.2',headers={'Cache-Control':'no-cache'})
+              response=urllib.request.urlopen(request,timeout=15)
+              html=response.read()
+              assert html==expected,'Waiting for release HTML'
+              assets=re.findall(r'(?:src|href)="(\./(?:app\.js|data\.js|styles\.css)\?v=[a-f0-9]+)"',html.decode())
+              assert len(assets)==3
+              for asset in assets:
+                name=asset[2:].split('?')[0]
+                r=urllib.request.urlopen(urllib.parse.urljoin(base,asset),timeout=15)
+                body=r.read()
+                assert body==Path(name).read_bytes(),name
+                print('PUBLIC_ASSET_OK',name,r.status,hashlib.sha256(body).hexdigest()[:12],flush=True)
+              r=urllib.request.urlopen(base.rstrip('/'),timeout=15)
+              assert r.status==200
+              print('PUBLIC_ROUTE_OK',r.geturl(),flush=True)
+              print('PUBLIC_RELEASE_OK 3.2.2',flush=True)
+              break
+            except Exception as error:
+              print('Waiting for publication:',str(error),flush=True)
+              if attempt==89: raise
+              time.sleep(5)
