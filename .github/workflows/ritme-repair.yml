@@ -1,0 +1,68 @@
+name: Verify Ritme 3.2.1 live fix
+on:
+  push:
+    branches: [ritme-fix-3-2-1]
+permissions:
+  contents: write
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply verified patch and run regression checks
+        run: |
+          python3 _ritme_patch.py
+          node --check data.js
+          node --check app.js
+          node --test tests/*.test.cjs
+          rm _ritme_patch.py .github/workflows/ritme-repair.yml
+          git add -A
+          git diff --cached --stat
+          git config user.name 'Ritme maintenance'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Verify compact tabs, asset versions and subdirectory paths'
+          git push origin HEAD:ritme-fix-3-2-1
+          echo "STAGED_TREE=$(git rev-parse HEAD^{tree})"
+  public-assets:
+    needs: stage
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ritme-fix-3-2-1
+      - name: Verify public HTML and matching release assets after publication
+        shell: python
+        run: |
+          from pathlib import Path
+          import re, time, hashlib, urllib.request, urllib.parse
+          base = 'https://fdwind1991.github.io/ritme/'
+          expected = Path('index.html').read_bytes()
+          for attempt in range(60):
+              try:
+                  req = urllib.request.Request(base + '?v=3.2.1', headers={'Cache-Control': 'no-cache'})
+                  response = urllib.request.urlopen(req, timeout=15)
+                  html = response.read()
+                  if html != expected:
+                      raise ValueError('Waiting for release HTML')
+                  assets = re.findall(r'(?:src|href)="(\./(?:app\.js|data\.js|styles\.css)\?v=[a-f0-9]+)"', html.decode())
+                  assert len(assets) == 3
+                  for asset in assets:
+                      name = asset[2:].split('?')[0]
+                      r = urllib.request.urlopen(urllib.parse.urljoin(base, asset), timeout=15)
+                      body = r.read()
+                      assert body == Path(name).read_bytes(), name + ' differs from verified release'
+                      print('PUBLIC_ASSET_OK', name, r.status, hashlib.sha256(body).hexdigest()[:12])
+                  r = urllib.request.urlopen(base.rstrip('/'), timeout=15)
+                  assert r.status == 200
+                  print('PUBLIC_ROUTE_OK', r.geturl())
+                  print('PUBLIC_RELEASE_OK 3.2.1')
+                  break
+              except Exception as exc:
+                  print('Waiting for publication:', type(exc).__name__, str(exc))
+                  if attempt == 59:
+                      raise
+                  time.sleep(5)
