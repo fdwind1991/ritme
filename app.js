@@ -4,6 +4,28 @@
 const $ = (id) => document.getElementById(id);
 const LEXICONS = RITME_DATA.lexicons;
 const BUILD_ENTROPY = RITME_DATA.entropy;
+const EXPANDED_LEXICONS = RITME_DATA.expandedLexicons;
+const CODE_CORPORA = RITME_DATA.codeCorpora;
+const CODE_LANGUAGES = Object.keys(CODE_CORPORA);
+function isCode(config){return config?.mode==='code';}
+function hasWordCorpus(config){return !!config && (config.mode==='words'||(config.mode==='practice'&&!guidedDrill(config)));}
+function selectedWordCorpus(config){
+  return !isStandard(config)&&config.wordCorpus==='expanded' ? EXPANDED_LEXICONS[config.language] : LEXICONS[config.language];
+}
+function corpusProfileSuffix(r){return r.wordCorpusVersion==='ritme-expanded-v1'?'|expanded-v1|'+(r.wordCorpusFingerprint||'unknown'):'';}
+function corpusLabel(r){return translate(r.wordCorpusVersion==='ritme-expanded-v1'?'corpus.expanded':'corpus.basic');}
+function codeName(language){return CODE_CORPORA[language]?.name || translate('code.label');}
+function makeCodePrompt(config,count){
+  const bank=CODE_CORPORA[config.language],lines=[];
+  if(!bank?.snippets.length)throw new Error(translate('code.unavailable'));
+  // Sample complete, source-attributed fragments, not mixed programming tokens.
+  // New text is appended below the prompt; visible lines are never rewritten.
+  while(lines.length<Math.min(count,24)){
+    const snippet=bank.snippets[secureInt(bank.snippets.length)];
+    lines.push(...snippet.text.split('\n'),'');
+  }
+  return lines;
+}
 const LANGUAGES = Object.keys(LEXICONS);
 const PUNCTUATION = [',', '.', ':', ';']; // The four marks in the supplied screenshots.
 const STANDARD_CORPORA={"nl":{"sha256":"e540d93a5b53af931121e51201a7d0e472ae4c510901759f44f89a8028df6f96","count":199},"en":{"sha256":"8642149a168fe15fa385b8eab47f64ade34cfb60553059e83e448ab54af9e3dc","count":200},"de":{"sha256":"1ece918c3f3cfdd8f4224fe9114672843bc9b464cea087ad7446f25a39a9b0af","count":200},"fr":{"sha256":"0ab9a649d4182777913cdae8f4d18fab303a3bc9d21ef6ce56efeb4be9088f4b","count":174},"es":{"sha256":"3ca3866b34723b99bfd97e0e413d3e5f8d343b455860d2c4e86331fb68c16835","count":197},"it":{"sha256":"e708b6dafe9b03b8c13350abd556472d7d7a62c84a0dfa9ed6784c73d907526e","count":199}};
@@ -32,7 +54,7 @@ function writeLocal(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); storageAvailable=true; return true; }
   catch { storageAvailable = false; return false; }
 }
-const defaults = { duration:120, language:'nl', numbers:false, punctuation:true, capitals:false, size:28, theme:'light', mode:'words', numberLength:'mixed', numberKeyboard:'row', uiLanguage:'nl', practiceLesson:'adaptive', practiceKeyboard:true, practiceColors:true, practiceInfinite:false, practiceKeys:[], wordPractice:false, keyboardLayout:'us', standardTest:false, standardLanguage:'nl', speedUnit:'wpm' };
+const defaults = { duration:120, language:'nl', numbers:false, punctuation:true, capitals:false, size:28, theme:'light', mode:'words', numberLength:'mixed', numberKeyboard:'row', uiLanguage:'nl', practiceLesson:'adaptive', practiceKeyboard:true, practiceColors:true, practiceInfinite:false, practiceKeys:[], wordPractice:false, keyboardLayout:'us', standardTest:false, standardLanguage:'nl', speedUnit:'wpm', wordCorpus:'expanded', codeLanguage:'python', codeInfinite:false, codeGuide:false };
 const savedSettings = readLocal(SETTINGS_KEY, {});
 const settings = {...defaults};
 if (savedSettings && typeof savedSettings === 'object') {
@@ -41,12 +63,12 @@ if (savedSettings && typeof savedSettings === 'object') {
   if ([...LANGUAGES,'random'].includes(savedSettings.language)) settings.language = savedSettings.language;
   if ([24,28,32,36].includes(savedSettings.size)) settings.size = savedSettings.size;
   if (['light','dark'].includes(savedSettings.theme)) settings.theme = savedSettings.theme;
-  if (['words','numbers','practice'].includes(savedSettings.mode)) settings.mode = savedSettings.mode;
+  if (['words','numbers','practice','code'].includes(savedSettings.mode)) settings.mode = savedSettings.mode;
   if (['mixed','2','3','4','6'].includes(savedSettings.numberLength)) settings.numberLength = savedSettings.numberLength;
   if (['row','numpad'].includes(savedSettings.numberKeyboard)) settings.numberKeyboard = savedSettings.numberKeyboard;
   if (['words','adaptive','home','top','bottom','letters','shift','digits','weak'].includes(savedSettings.practiceLesson)) settings.practiceLesson=savedSettings.practiceLesson;
   if (Array.isArray(savedSettings.practiceKeys)) settings.practiceKeys=savedSettings.practiceKeys.filter(k=>typeof k==='string'&&/^[a-zà-ž]$/i.test(k)).slice(0,8);
-  for (const key of ['numbers','punctuation','capitals','practiceKeyboard','practiceColors','practiceInfinite','standardTest']) if (typeof savedSettings[key] === 'boolean') settings[key] = savedSettings[key];
+  for (const key of ['numbers','punctuation','capitals','practiceKeyboard','practiceColors','practiceInfinite','standardTest','codeInfinite','codeGuide']) if (typeof savedSettings[key] === 'boolean') settings[key] = savedSettings[key];
 }
 if(['us','de','fr'].includes(savedSettings?.keyboardLayout))settings.keyboardLayout=savedSettings.keyboardLayout;
 if(['wpm','cpm','kph'].includes(savedSettings?.speedUnit))settings.speedUnit=savedSettings.speedUnit;
@@ -62,6 +84,8 @@ if(settings.mode === 'practice') {settings.wordPractice=true;settings.standardTe
    schemas and CSV headers are intentionally independent of UI language.
    Only trusted, bundled help paragraphs use innerHTML; dynamic values are
    inserted as text or escaped by safeText(). The GPL text is not translated. */
+if(['basic','expanded'].includes(savedSettings?.wordCorpus))settings.wordCorpus=savedSettings.wordCorpus;
+if(CODE_LANGUAGES.includes(savedSettings?.codeLanguage))settings.codeLanguage=savedSettings.codeLanguage;
 const INTERFACE_MESSAGES=RITME_DATA.messages;
 function translate(key,values={}){
   const entry=INTERFACE_MESSAGES[key];
@@ -148,7 +172,7 @@ function applyWordCapitalization(text, language, options, state) {
   return chars.join('');
 }
 function makeWords(language, count, options, practiceKeys=[], state={capitalizeNext:true}) {
-  let corpus = LEXICONS[language].words;
+  let corpus = selectedWordCorpus({...options,language}).words;
   if (practiceKeys.length) {
     const candidates = corpus.filter(word => practiceKeys.some(key => word.toLowerCase().includes(key)));
     if (candidates.length >= 5) corpus = candidates;
@@ -173,16 +197,20 @@ function makeNumbers(count, options) {
   });
 }
 function makePrompt(config,count,offset=0,state={capitalizeNext:offset===0}){
-  return config.mode==='numbers'?makeNumbers(count,config):config.mode==='practice'?makePracticePrompt(config,count,offset,state):makeWords(config.language,count,config,config.practiceKeys||[],state);
+  return isCode(config)?makeCodePrompt(config,count):config.mode==='numbers'?makeNumbers(count,config):config.mode==='practice'?makePracticePrompt(config,count,offset,state):makeWords(config.language,count,config,config.practiceKeys||[],state);
 }
 function usesCapitalization(config){
   return config.capitals===true && (config.mode==='words' || (config.mode==='practice' && !guidedDrill(config)));
 }
-function isInfinitePractice(config){return config?.mode==='practice' && config.practiceInfinite===true;}
+function isInfinitePractice(config){return (config?.mode==='practice' && config.practiceInfinite===true)||(isCode(config)&&config.codeInfinite===true);}
+function elapsedClock(seconds){
+  const n=Math.max(0,Math.floor(seconds)),s=String(n%60).padStart(2,'0'),m=Math.floor(n/60);
+  return m<60?`${m}:${s}`:`${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}:${s}`;
+}
 function sessionLimit(){return isInfinitePractice(session?.config)?Infinity:(session?.config.duration??settings.duration);}
 function fmtPercent(n) { return Number.isFinite(n) ? formatNumber(n,1)+'%' : '—'; }
 function clock(seconds) { const n=Math.max(0,Math.ceil(seconds)); return `${Math.floor(n/60)}:${String(n%60).padStart(2,'0')}`; }
-function labelKey(key) { return key === ' ' ? translate("Space") : key; }
+function labelKey(key) { return key==='\n'?'Enter ↵':key === ' ' ? translate("Space") : key; }
 function round(n,d=2) { return Number(n.toFixed(d)); }
 function safeText(value) { return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -196,6 +224,9 @@ class TypingSession {
     this.config = {...config}; this.promptState=promptState; this.words=[]; this.index=0; this.finite=finite; this.generatedWordCount=0;
     this.presses=[]; this.errors=[]; this.omissions=[]; this.keys={}; this.pairs={}; this.samples=[];
     this.started=null; this.finished=false; this.interrupted=false; this.backspaces=0;
+    // Unlimited practice keeps exact lifetime totals without retaining every key event.
+    // No practice totals or temporary summaries are written to browser storage.
+    this.practiceTotals=isInfinitePractice(config)?{correct:0,retained:0,missing:0,corrected:0,binIndex:0,binCount:0,binSum:0,binSquareSum:0}:null;
     this.addWords(words);
   }
   addWords(words) { this.generatedWordCount+=words.length; this.words.push(...words.map(text=>({text,chars:Array.from(text),input:[],space:null,omission:null,submitted:false}))); }
@@ -229,6 +260,7 @@ class TypingSession {
       const record={ch,t,good,matches:good,removedAt:null,errorId:good?null:this.addError(expected||ch,t)};
       w.input.push(record);this.presses.push(record);
     }
+    this.recordPracticePress(t);
     return true;
   }
   removeRecord(record,t){
@@ -249,17 +281,61 @@ class TypingSession {
     do { this.removeRecord(w.input.pop(),t); } while(word && w.input.length);
     return true;
   }
+  recordPracticePress(t){
+    const totals=this.practiceTotals;if(!totals)return;
+    // Match the timed-test bins: (n-1,n], with t=0 in the first bin.
+    const bin=Math.max(0,Math.ceil(t)-1);
+    if(bin>totals.binIndex){
+      totals.binSum+=totals.binCount;totals.binSquareSum+=totals.binCount**2;
+      totals.binIndex=bin;totals.binCount=0;
+    }
+    totals.binCount++;
+  }
+  practiceConsistency(t){
+    const full=Math.floor(t),totals=this.practiceTotals;if(!totals||full<5)return null;
+    const includeOpen=totals.binIndex<full;
+    const sum=totals.binSum+(includeOpen?totals.binCount:0);
+    const squares=totals.binSquareSum+(includeOpen?totals.binCount**2:0);
+    const mean=sum/full,variance=Math.max(0,squares/full-mean**2);
+    return mean?100/(1+Math.sqrt(variance)/mean):0;
+  }
+  archivePracticeRecords(retained,retainedOmissions){
+    const totals=this.practiceTotals;if(!totals)return;
+    const previousErrors=this.errors,nextErrors=[],nextPresses=[];
+    for(const press of this.presses){
+      const error=press.errorId===null?null:previousErrors[press.errorId];
+      if(retained.has(press)){
+        if(error){press.errorId=nextErrors.length;nextErrors.push(error);}
+        nextPresses.push(press);
+      }else{
+        if(press.removedAt===null){totals.retained++;if(press.matches)totals.correct++;}
+        if(error?.resolved)totals.corrected++;
+      }
+    }
+    for(const omission of this.omissions){
+      if(!retainedOmissions.has(omission)&&omission.removedAt===null)totals.missing+=omission.count;
+    }
+    this.presses=nextPresses;this.errors=nextErrors;
+    this.omissions=this.omissions.filter(o=>retainedOmissions.has(o));
+  }
   metric(t) {
     const alive=this.presses.filter(p=>p.t<=t && (p.removedAt===null || p.removedAt>t));
-    const correct=alive.reduce((n,p)=>n+(p.matches?1:0),0);
-    const missing=this.omissions.reduce((n,o)=>n+(o.t<=t && (o.removedAt===null||o.removedAt>t) ? o.count : 0),0);
-    const all=this.presses.filter(p=>p.t<=t);const good=all.reduce((n,p)=>n+(p.good?1:0),0);
+    const archived=this.practiceTotals;
+    const correct=(archived?.correct||0)+alive.reduce((n,p)=>n+(p.matches?1:0),0);
+    const retained=(archived?.retained||0)+alive.length;
+    const missing=(archived?.missing||0)+this.omissions.reduce((n,o)=>n+(o.t<=t && (o.removedAt===null||o.removedAt>t) ? o.count : 0),0);
+    const all=this.presses.filter(p=>p.t<=t);
+    // For unlimited sessions metric() describes the current lifetime state;
+    // keys includes attempts that have already left the editable backspace window.
+    const counts=archived?Object.values(this.keys):null;
+    const attempts=counts?counts.reduce((n,k)=>n+k.attempts,0):all.length;
+    const good=counts?counts.reduce((n,k)=>n+k.attempts-k.errors,0):all.reduce((n,p)=>n+(p.good?1:0),0);
     const seconds=Math.max(t,.001);
-    return {wpm:correct*12/seconds,raw:alive.length*12/seconds,cpm:correct*60/seconds,
-      accuracy:alive.length+missing?correct/(alive.length+missing)*100:100,
-      keystrokeAccuracy:all.length?good/all.length*100:100,
-      typos:all.length-good,uncorrected:alive.length-correct+missing,
-      corrected:this.errors.filter(e=>e.resolved).length,attempts:all.length,correct,retained:alive.length,missing};
+    return {wpm:correct*12/seconds,raw:retained*12/seconds,cpm:correct*60/seconds,
+      accuracy:retained+missing?correct/(retained+missing)*100:100,
+      keystrokeAccuracy:attempts?good/attempts*100:100,
+      typos:attempts-good,uncorrected:retained-correct+missing,
+      corrected:(archived?.corrected||0)+this.errors.filter(e=>e.resolved).length,attempts,correct,retained,missing};
   }
   sample(t) {
     const window=Math.min(5,t), burstWindow=Math.min(1,t);
@@ -274,12 +350,15 @@ class TypingSession {
     while(next<=until){this.samples.push(this.sample(next));next++;}
   }
   finish(t,reason='time') {
-    this.captureSamples(t);
-    if(!this.samples.length || t-this.samples[this.samples.length-1].t>.04) this.samples.push(this.sample(t));
+    const temporary=isInfinitePractice(this.config);
+    if(!temporary){
+      this.captureSamples(t);
+      if(!this.samples.length || t-this.samples[this.samples.length-1].t>.04) this.samples.push(this.sample(t));
+    }
     this.finished=true;
-    const m=this.metric(t);let consistency=null;
+    const m=this.metric(t);let consistency=temporary?this.practiceConsistency(t):null;
     const full=Math.floor(t);
-    if(full>=5){
+    if(!temporary&&full>=5){
       const bins=Array.from({length:full},()=>0);
       for(const p of this.presses) {
         // Bins are (n-1,n], with the first press at 0 included in bin zero.
@@ -291,7 +370,8 @@ class TypingSession {
     }
     return {version:1,id:String(Date.now())+'-'+String(performance.now()).replace('.',''),date:new Date().toISOString(),
       ...Object.fromEntries(Object.entries(m).map(([k,v])=>[k,round(v)])),
-      duration:round(t,3),plannedDuration:this.config.duration,language:this.config.language,mode:this.config.mode,
+      duration:round(t,3),plannedDuration:temporary?null:this.config.duration,language:this.config.language,mode:this.config.mode,
+      ...(temporary?{practiceInfinite:true,ephemeral:true}:{}),
       numbers:this.config.numbers,punctuation:this.config.punctuation,capitals:usesCapitalization(this.config),numberLength:this.config.numberLength,practiceKeys:this.config.practiceKeys||[],
       ...(this.config.mode==='numbers'?{numberKeyboard:this.config.numberKeyboard==='numpad'?'numpad':'row',numberAided:!!this.config.numberAided}:{}),
       ...(usesCapitalization(this.config)?{capitalPlacement:'initial'}:{}),
@@ -300,7 +380,53 @@ class TypingSession {
       keyboardLayout:layoutId(this.config),
       ...(isStandard(this.config)?{standardVersion:this.config.standardVersion,corpusFingerprint:this.config.corpusFingerprint,scoringVersion:'ritme-output-v1'}:{}),
       ...(isAdaptive(this.config)?{adaptiveVersion:1,adaptiveFocus:[...(this.config.adaptiveFocus||[])]}:{}),
-      pairs:structuredClone(this.pairs),keys:structuredClone(this.keys),errors:this.errors.map(e=>({...e,t:round(e.t,3)})),samples:this.samples.map(s=>({...s}))};
+      ...(this.config.wordCorpusVersion?{wordCorpusVersion:this.config.wordCorpusVersion,wordCorpusFingerprint:this.config.wordCorpusFingerprint}:{}),
+      pairs:structuredClone(this.pairs),keys:structuredClone(this.keys),errors:temporary?[]:this.errors.map(e=>({...e,t:round(e.t,3)})),samples:temporary?[]:this.samples.map(s=>({...s}))};
+  }
+}
+
+
+/** Code mode is line-aware. Spaces are characters, Enter ends a logical line.
+ * Display markers/line numbers are never counted. There is no evaluation,
+ * auto-completion or auto-indentation. A premature Enter records omissions.
+ */
+class CodeTypingSession extends TypingSession {
+  addWords(lines){
+    for(const text of lines){
+      this.words.push({text,chars:Array.from(text),input:[],space:null,omission:null,submitted:false,lineNumber:++this.generatedWordCount});
+    }
+  }
+  insert(ch,now=performance.now()){
+    if(this.finished||!this.current)return false;
+    if(ch!=='\n'&&/[\u0000-\u001f\u007f]/.test(ch))return false;
+    this.begin(now);const t=this.elapsed(now),w=this.current;
+    if(ch==='\n'){
+      const missing=Math.max(0,w.chars.length-w.input.length),good=missing===0;
+      this.recordKey('\n',good);
+      const press={ch,t,good,matches:true,removedAt:null,errorId:good?null:this.addError('\n',t)};
+      this.presses.push(press);w.space=press;w.submitted=true;
+      if(missing){w.omission={t,count:missing,removedAt:null};this.omissions.push(w.omission);}
+      this.index++;
+    }else{
+      const expected=w.chars[w.input.length],good=ch===expected;
+      this.recordKey(expected??ch,good);
+      const press={ch,t,good,matches:good,removedAt:null,errorId:good?null:this.addError(expected??ch,t)};
+      w.input.push(press);this.presses.push(press);
+    }
+    this.recordPracticePress(t);return true;
+  }
+  erase(word=false,now=performance.now()){
+    if(!word||!this.current?.input.length)return super.erase(false,now);
+    if(!this.running)return false;
+    const t=this.elapsed(now),input=this.current.input;this.backspaces++;
+    while(input.length&&input.at(-1).ch===' ')this.removeRecord(input.pop(),t);
+    while(input.length&&input.at(-1).ch!==' ')this.removeRecord(input.pop(),t);
+    return true;
+  }
+  finish(t,reason='time'){
+    return {...super.finish(t,reason),codeVersion:'ritme-code-v1',
+      codeCorpusFingerprint:this.config.codeCorpusFingerprint,codeAided:!!this.config.codeAided,
+      ...(this.config.codeInfinite?{codeInfinite:true}:{}),scoringVersion:'ritme-code-output-v1'};
   }
 }
 
@@ -320,48 +446,57 @@ function applyAppearance(){
 }
 function updateControls(){
   const standard=standardActive();
-  const running=!!session?.running,isNumbers=mode==='numbers',isCustom=mode==='custom',isPractice=mode==='practice',isDrill=isPractice&&!['words','weak','adaptive'].includes(settings.practiceLesson),infinite=isPractice&&settings.practiceInfinite;
+  const running=!!session?.running,isNumbers=mode==='numbers',isCustom=mode==='custom',isPractice=mode==='practice',isDrill=isPractice&&!['words','weak','adaptive'].includes(settings.practiceLesson),isCodeMode=mode==='code',infinite=(isPractice&&settings.practiceInfinite)||(isCodeMode&&settings.codeInfinite);
   document.body.classList.toggle('practice-infinite',infinite);
-  $('practice-infinite-btn').hidden=!isPractice;
+  $('practice-infinite-btn').hidden=!(isPractice||isCodeMode);
+  document.body.classList.toggle('code-active',isCodeMode);
+  $('code-btn').setAttribute('aria-pressed',String(isCodeMode));
+  $('code-settings').hidden=!isCodeMode;
+  $('code-language').value=settings.codeLanguage;$('code-language').disabled=running;
+  $('code-btn').disabled=running;
   $('practice-infinite-note').hidden=!infinite;
   document.querySelectorAll('[data-duration]').forEach(b=>{b.setAttribute('aria-pressed',String(b.dataset.duration==='infinite'?infinite:!infinite&&Number(b.dataset.duration)===(standard?60:settings.duration)));b.disabled=running||standard;if(b.dataset.duration!=='infinite')b.hidden=standard&&b.dataset.duration!=='60';});
   $('stop-btn').dataset.i18nTitle=infinite?'practice.infinite.stop':'Afronden met de verstreken tijd';
   $('stop-btn').title=translate($('stop-btn').dataset.i18nTitle);
   $('focus-note').dataset.i18n=infinite?'practice.infinite.focus':'De timer loopt door.';
   $('focus-note').textContent=translate($('focus-note').dataset.i18n);
-  if(infinite)$('timer').setAttribute('aria-label',translate('practice.infinite.title'));else $('timer').removeAttribute('aria-label');
+  if(infinite)$('timer').setAttribute('aria-label',translate('practice.infinite.elapsed'));else $('timer').removeAttribute('aria-label');
   $('language').value=standard?settings.standardLanguage:settings.language;$('language').disabled=running;
   const random=$('language').querySelector('[value="random"]');if(random){random.hidden=standard;random.disabled=standard;}
   $('word-activity').value=standard?'standard':isPractice?'practice':'free';$('word-activity').dataset.active=String(standard||isPractice);
   $('word-activity').style.width=Math.min(162,Math.max(76,$('word-activity').selectedOptions[0].textContent.length*6.6+24))+'px';
-  $('word-activity-wrap').hidden=isNumbers||isCustom;
+  $('word-activity-wrap').hidden=isNumbers||isCustom||isCodeMode;
   $('keyboard-layout').value=settings.keyboardLayout;$('keyboard-layout').disabled=running;
   $('words-btn').setAttribute('aria-pressed',String(mode==='words'||isPractice));
   $('numbers-btn').setAttribute('aria-pressed',String(isNumbers));$('custom-btn').setAttribute('aria-pressed',String(isCustom));
   $('mix-numbers-btn').setAttribute('aria-pressed',String(settings.numbers));
   $('punctuation-btn').setAttribute('aria-pressed',String(settings.punctuation));
   $('capitals-btn').setAttribute('aria-pressed',String(settings.capitals));
-  $('capitals-btn').hidden=standard||isNumbers||isCustom||isDrill;
-  $('capitalization-hint').hidden=standard||!settings.capitals||isNumbers||isCustom||isDrill;
+  $('capitals-btn').hidden=standard||isNumbers||isCustom||isCodeMode||isDrill;
+  $('capitalization-hint').hidden=standard||!settings.capitals||isNumbers||isCustom||isCodeMode||isDrill;
   $('capitalization-hint').textContent=translate(settings.punctuation?'capitals.hint.punctuation':'capitals.hint.random');
   for(const id of ['words-btn','numbers-btn','word-activity','punctuation-btn','capitals-btn','mix-numbers-btn','custom-btn','number-length','number-keyboard'])$(id).disabled=running;
-  $('language-wrap').hidden=isNumbers||isDrill;$('number-settings').hidden=!isNumbers;$('number-length').value=settings.numberLength;$('number-keyboard').value=settings.numberKeyboard;
-  $('mix-numbers-btn').hidden=standard||isNumbers||isCustom||isDrill||isAdaptive(session?.config);$('punctuation-btn').hidden=standard||isNumbers||isCustom||isDrill;
+  $('language-wrap').hidden=isNumbers||isDrill||isCodeMode;$('number-settings').hidden=!isNumbers;$('number-length').value=settings.numberLength;$('number-keyboard').value=settings.numberKeyboard;
+  $('mix-numbers-btn').hidden=standard||isNumbers||isCustom||isCodeMode||isDrill||isAdaptive(session?.config);$('punctuation-btn').hidden=standard||isNumbers||isCustom||isCodeMode||isDrill;
   const notes=[];
-  if(!standard&&settings.language==='random'&&session&&!isNumbers&&!isDrill)notes.push(resultLanguage(session.config));
+  if(!standard&&settings.language==='random'&&session&&!isNumbers&&!isDrill&&!isCodeMode)notes.push(resultLanguage(session.config));
 
   $('language-note').textContent=notes.join(' · ');$('language-note').hidden=!notes.length;
   $('stage-label').textContent=isNumbers?translate(isNumpad(session.config)?'numpad.stage':'Alleen cijfers · spatie tussen getallen'):isCustom?translate("Eigen tekst · ")+resultLanguage(session.config):resultLanguage(session.config)+' · '+(mode==='practice'?translate("gerichte oefening"):translate("losse woorden"));
   $('hint-main').textContent=isNumbers?translate("Typ de getallen over"):isCustom?translate("Typ je eigen tekst over"):translate("Begin met typen");
   if(isPractice)$('hint-main').textContent=translate(infinite?'practice.infinite.hint':'practice.hint');
   renderCoach();renderTestInfo();
-  if(!running){$('timer').hidden=false;$('timer').textContent=infinite?'∞':clock(standard?60:settings.duration);$('timer').classList.remove('warning');}
+  if(!running){
+    $('timer').hidden=false;$('timer').textContent=infinite?'∞ 0:00':clock(standard?60:settings.duration);$('timer').classList.remove('warning');
+    if(infinite){$('live-dot').hidden=false;$('live-wpm').hidden=false;renderLiveMetric(session.metric(0),0);}
+  }else updateLive();
 }
 function createWordNode(word){
-  const el=document.createElement('span');el.className='word';
-  const chars=word.chars.map(ch=>{const s=document.createElement('span');s.className='char';s.textContent=ch;setFingerStyle(s,ch);el.append(s);return s;});
+  const el=document.createElement('span');el.className='word'+(isCode(session?.config)?' code-line':'');
+  if(isCode(session?.config))el.dataset.line=String(word.lineNumber);
+  const chars=word.chars.map(ch=>{const s=document.createElement('span');s.className='char';s.textContent=ch;if(ch===' ')s.dataset.space='true';setFingerStyle(s,ch);el.append(s);return s;});
   const extras=document.createElement('span');extras.className='extras';el.append(extras);
-  const gap=document.createElement('span');gap.className='gap';gap.textContent=' ';setFingerStyle(gap,' ');el.append(gap);
+  const gap=document.createElement('span');gap.className='gap';gap.textContent=isCode(session?.config)?'↵':' ';setFingerStyle(gap,isCode(session?.config)?'\n':' ');el.append(gap);
   return {el,chars,extras,gap};
 }
 function appendNodes(){
@@ -386,7 +521,8 @@ function renderWord(index){
 function scrollToCaret(){
   const node=nodes[session?.index];if(!node)return;
   const lh=parseFloat(getComputedStyle($('typing-viewport')).lineHeight);
-  const offset=Math.max(0,node.el.offsetTop-lh);
+  const caret=isCode(session?.config)?node.el.querySelector('.current'):null;
+  const offset=Math.max(0,(caret?caret.getBoundingClientRect().top-$('word-track').getBoundingClientRect().top:node.el.offsetTop)-lh);
   $('word-track').style.setProperty('--scroll-y',-offset+'px');
 }
 function focusTyping(){if(!$('test-view').hidden && !document.querySelector('dialog[open]'))$('capture').focus({preventScroll:true});}
@@ -403,9 +539,12 @@ function newTest(){
     if(mode==='practice'&&settings.practiceLesson!=='weak')practiceKeys=[];
     resetCoach();useKeyboardLayout(settings);
     const standard=standardActive();
-    const language=mode==='numbers'?'none':standard?settings.standardLanguage:settings.language==='random'?LANGUAGES[secureInt(LANGUAGES.length)]:settings.language;
+    const language=mode==='code'?settings.codeLanguage:mode==='numbers'?'none':standard?settings.standardLanguage:settings.language==='random'?LANGUAGES[secureInt(LANGUAGES.length)]:settings.language;
     const config={...settings,language,mode,practiceKeys:[...practiceKeys],numbers:mode==='numbers'||(mode!=='custom'&&settings.numbers),punctuation:mode!=='numbers'&&mode!=='custom'&&settings.punctuation,capitals:mode!=='numbers'&&mode!=='custom'&&settings.capitals};
     config.practiceInfinite=mode==='practice'&&settings.practiceInfinite;
+    if(isCode(config))Object.assign(config,{numbers:false,punctuation:false,capitals:false,practiceKeys:[],
+      codeInfinite:settings.codeInfinite,codeVersion:'ritme-code-v1',codeCorpusFingerprint:CODE_CORPORA[language].sha256,
+      codeAided:settings.codeGuide&&!!(settings.practiceKeyboard||settings.practiceColors)});
     config.capitalPlacement='initial';
     if(standard){Object.assign(config,{duration:60,numbers:false,punctuation:false,capitals:false,practiceKeys:[],practiceInfinite:false,standardVersion:'ritme-standard-v1',corpusFingerprint:STANDARD_CORPORA[language].sha256,scoringVersion:'ritme-output-v1'});}
     if(isAdaptive(config))config.numbers=false;
@@ -414,12 +553,17 @@ function newTest(){
       config.practiceGuideVersion=1;config.practiceLesson=settings.practiceLesson;config.practiceAided=!!(settings.practiceColors||settings.practiceKeyboard);
       if(guidedDrill(config)){config.numbers=false;config.punctuation=false;config.capitals=false;}
     }
+    if(hasWordCorpus(config)&&!standard){
+      const corpus=selectedWordCorpus(config);
+      config.wordCorpusVersion=config.wordCorpus==='expanded'?'ritme-expanded-v1':'ritme-basic-v1';
+      if(corpus.sha256)config.wordCorpusFingerprint=corpus.sha256;
+    }
     const promptState={capitalizeNext:true};
     const words=mode==='custom'?customText.split(' '):makePrompt(config,isAdaptive(config)?48:180,0,promptState);
-    session=new TypingSession(config,words,mode==='custom',promptState);appendNodes();renderWord(0);
+    session=new (isCode(config)?CodeTypingSession:TypingSession)(config,words,mode==='custom',promptState);appendNodes();renderWord(0);
     $('accessible-prompt').textContent=translate("Over te typen: ")+words.slice(0,35).join(' ');
     for(const id of ['live-dot','live-wpm','stop-btn'])$(id).hidden=true;
-    if(['words','numbers','practice'].includes(mode)){settings.mode=mode;if(mode!=='numbers')settings.wordPractice=mode==='practice';persistSettings();}
+    if(['words','numbers','practice','code'].includes(mode)){settings.mode=mode;if(mode!=='numbers'&&mode!=='code')settings.wordPractice=mode==='practice';persistSettings();}
     updateControls();updatePersonalBest();window.scrollTo({top:0,behavior:'instant'});requestAnimationFrame(focusTyping);
   }catch(error){$('fatal-error').textContent=error.message;$('fatal-error').hidden=false;}
 }
@@ -430,26 +574,36 @@ function requestNewTest(action=newTest){
   if(session?.running&&!isInfinitePractice(session.config)){askConfirm(translate("Nieuwe test starten?"),translate("Je huidige test wordt afgebroken en niet opgeslagen. De timer loopt door totdat je een keuze maakt."),translate("Opnieuw beginnen"),action);}
   else action();
 }
+function renderLiveMetric(metric,t){
+  const practice=session?.config.mode==='practice'||isCode(session?.config),wpm=t>=1?Math.round(metric.wpm):0;
+  $('live-wpm').textContent=practice
+    ?translate('practice.live.metrics',{wpm,accuracy:fmtPercent(metric.keystrokeAccuracy)})
+    :wpm+' wpm';
+  if(practice){
+    $('live-wpm').title=translate('practice.live.explanation');
+    $('live-wpm').setAttribute('aria-label',translate('practice.live.aria',{wpm,accuracy:fmtPercent(metric.keystrokeAccuracy)}));
+  }else{
+    $('live-wpm').removeAttribute('title');$('live-wpm').removeAttribute('aria-label');
+  }
+}
 function updateLive(){
   if(!session?.running)return;
-  if(isInfinitePractice(session.config)){
-    // Lifetime key counters are small. No time series, WPM score or saved record.
-    const counts=Object.values(session.keys),attempts=counts.reduce((n,k)=>n+k.attempts,0),errors=counts.reduce((n,k)=>n+k.errors,0);
-    $('timer').textContent='∞';$('timer').classList.remove('warning');
-    $('live-wpm').textContent=translate('practice.live',{accuracy:fmtPercent(attempts?(attempts-errors)/attempts*100:100)});
-    return;
-  }
-  const limit=sessionLimit(),t=Math.min(session.elapsed(),limit);
-  session.captureSamples(t);
+  const infinite=isInfinitePractice(session.config),limit=sessionLimit(),t=Math.min(session.elapsed(),limit);
+  // Free practice keeps lifetime aggregates, not an unbounded per-second graph.
+  if(!infinite)session.captureSamples(t);
   const metric=session.metric(t);
-  $('timer').textContent=clock(limit-t);$('timer').classList.toggle('warning',limit-t<=10);
-  $('live-wpm').textContent=mode==='practice'?translate('practice.live',{accuracy:fmtPercent(metric.keystrokeAccuracy)}):(t>=1?Math.round(metric.wpm):0)+' wpm';
-  $('test-time-fill').style.transform='scaleX('+Math.max(0,1-t/limit)+')';
-  if(t>=limit)completeTest('time',limit);
+  $('timer').textContent=infinite?'∞ '+elapsedClock(t):clock(limit-t);
+  $('timer').classList.toggle('warning',!infinite&&limit-t<=10);
+  renderLiveMetric(metric,t);
+  if(!infinite){
+    $('test-time-fill').style.transform='scaleX('+Math.max(0,1-t/limit)+')';
+    if(t>=limit)completeTest('time',limit);
+  }
 }
 /** Keep free practice bounded even during long sessions. Retain a generous
  * backspace window and the unfinished prompt. Lifetime key counters and the
- * prompt generator state survive recycling; no result is ever manufactured. */
+ * prompt generator state survive recycling. Retired text is counted once so
+ * live and final feedback remain exact after many thousands of words. */
 function compactInfinitePractice(){
   if(!isInfinitePractice(session?.config))return;
   let cut=0;
@@ -466,23 +620,22 @@ function compactInfinitePractice(){
   }
   const retained=new Set();
   for(const word of session.words){for(const press of word.input)retained.add(press);if(word.space)retained.add(word.space);}
-  session.presses=session.presses.filter(p=>retained.has(p));
-  const oldErrors=session.errors;session.errors=[];
-  for(const press of session.presses)if(press.errorId!==null){
-    const error=oldErrors[press.errorId];press.errorId=session.errors.length;session.errors.push(error);
-  }
-  session.omissions=session.words.filter(w=>w.omission).map(w=>w.omission);
+  const retainedOmissions=new Set(session.words.filter(w=>w.omission).map(w=>w.omission));
+  session.archivePracticeRecords(retained,retainedOmissions);
   if(cut){
     const track=$('word-track');track.classList.add('is-recycling');scrollToCaret();
     void track.offsetHeight;track.classList.remove('is-recycling');
     $('accessible-prompt').textContent=translate('Over te typen: ')+session.words.slice(session.index,session.index+35).map(w=>w.text).join(' ');
   }
 }
-function stopInfinitePractice(){
-  if(!isInfinitePractice(session?.config))return;
-  clearInterval(timerHandle);timerHandle=null;session.finished=true;resetCoach();
+function stopInfinitePractice(t=session?.elapsed()||0){
+  if(!isInfinitePractice(session?.config)||session.finished)return;
+  clearInterval(timerHandle);timerHandle=null;resetCoach();
+  const result=session.finish(Math.max(t,.001),'practice');
   for(const dialog of document.querySelectorAll('dialog[open]'))dialog.close();
-  newTest();toast(translate('practice.infinite.stopped'));
+  // A summary is feedback, not a stored test. Never call writeLocal or touch history.
+  showResult(result);
+  $('announcer').textContent=translate('practice.summary.announce',{wpm:Math.round(result.wpm),accuracy:fmtPercent(result.keystrokeAccuracy)});
 }
 function startUi(){
   document.body.classList.add('running');for(const id of ['timer','live-dot','live-wpm','stop-btn'])$(id).hidden=false;
@@ -492,9 +645,9 @@ function insertText(text){
   if(!session || session.finished || $('test-view').hidden || document.querySelector('dialog[open]'))return;
   if(session.running && session.elapsed()>=sessionLimit()){completeTest('time',sessionLimit());return;}
   const oldIndex=session.index,wasRunning=session.running;
-  const chars=Array.from(text.normalize('NFC').replace(/[\r\n\t]/g,' '));
+  const chars=Array.from(isCode(session.config)?text.normalize('NFC').replace(/\r\n?/g,'\n'):text.normalize('NFC').replace(/[\r\n\t]/g,' '));
   for(const ch of chars){
-    if(/[\u0000-\u001f\u007f]/.test(ch))continue;
+    if(/[\u0000-\u001f\u007f]/.test(ch)&&!(isCode(session.config)&&ch==='\n'))continue;
     if(session.running && session.elapsed()>=sessionLimit()){completeTest('time',sessionLimit());return;}
     if(!session.finite && session.index>=session.words.length-(isAdaptive(session.config)?12:25)){session.addWords(makePrompt(session.config,isAdaptive(session.config)?32:100,session.generatedWordCount,session.promptState));appendNodes();if(isAdaptive(session.config))updateAdaptiveInfo();}
     const expected=expectedPracticeChar();
@@ -515,19 +668,29 @@ function eraseInput(word=false){
 }
 function completeTest(reason,t){
   if(!session || session.finished)return;
-  // A hard storage boundary: unlimited sessions never finish into a result.
-  if(isInfinitePractice(session.config)){stopInfinitePractice();return;}
+  // Unlimited sessions have a temporary summary, never a stored result.
+  if(isInfinitePractice(session.config)){stopInfinitePractice(t);return;}
   clearInterval(timerHandle);timerHandle=null;document.body.classList.remove('running');
   const result=session.finish(Math.max(t,.001),reason);
   if(result.attempts){history.unshift(result);history=history.slice(0,100);if(!writeLocal(STORAGE_KEY,history))toast(translate("Opslag niet beschikbaar. Download een back-up via Voortgang → Beheer."));}
   for(const dialog of document.querySelectorAll('dialog[open]'))dialog.close();
   showResult(result);$('announcer').textContent=translate('result.announce',{wpm:Math.round(result.wpm),accuracy:formatNumber(result.accuracy,1)});
 }
-function resultModeLabel(r){if(isStandard(r))return translate('standard.heading');if(r.mode==='numbers'&&isNumpad(r))return translate('numpad.label');if(r.mode==='practice'&&r.practiceGuideVersion===1)return translate('practice.mode')+' · '+practiceLessonLabel(r.practiceLesson);return r.mode==='numbers'?translate("alleen cijfers"):r.mode==='custom'?translate("eigen tekst"):r.mode==='practice'?translate("gerichte oefening"):translate("woorden");}
+function resultModeLabel(r){if(isCode(r))return translate('code.label');if(isStandard(r))return translate('standard.heading');if(r.mode==='numbers'&&isNumpad(r))return translate('numpad.label');if(r.mode==='practice'&&r.practiceGuideVersion===1)return translate('practice.mode')+' · '+practiceLessonLabel(r.practiceLesson);return r.mode==='numbers'?translate("alleen cijfers"):r.mode==='custom'?translate("eigen tekst"):r.mode==='practice'?translate("gerichte oefening"):translate("woorden");}
 function showResult(result,preserveView=false){
   currentResult=result;syncResultDeleteControl();if(!preserveView)setView('result');document.body.classList.remove('running');
-  const context=[resultLanguage(result),`${round(result.duration,1)}s`,resultModeLabel(result)];
-  if(result.keyboardLayout&&result.mode!=='numbers')context.push(layoutLabel(result));
+  const temporary=isInfinitePractice(result)||result.ephemeral===true;
+  const context=[resultLanguage(result),temporary?'∞ '+elapsedClock(result.duration):`${round(result.duration,1)}s`,resultModeLabel(result)];
+  $('practice-session-note').hidden=!temporary;
+  $('practice-session-detail').hidden=!temporary;
+  if(temporary)$('practice-session-detail').textContent=translate('practice.summary.details',{attempts:formatNumber(result.attempts),correct:formatNumber(result.correct),backspaces:formatNumber(result.backspaces)});
+  $('results-view').dataset.ephemeral=String(temporary);
+  $('results-view').setAttribute('aria-label',translate(temporary?'practice.summary.title':'Testresultaat'));
+  const speedLabel=$('result-speed-label');speedLabel.dataset.i18n=temporary?'practice.summary.wpm':'WPM';speedLabel.textContent=temporary?translate('practice.summary.wpm'):'WPM';
+  const again=$('again-btn').querySelector('[data-i18n]');again.dataset.i18n=temporary?'practice.summary.again':'Nog een test';again.textContent=translate(again.dataset.i18n);
+  if(hasWordCorpus(result)&&!isStandard(result))context.push(corpusLabel(result));
+  if(isCode(result))context.push(translate(result.codeAided?'practice.result.aided':'practice.result.unaided'));
+  if(result.keyboardLayout&&result.mode!=='numbers'&&!guidedDrill(result))context.push(layoutLabel(result));
   if(result.mode==='numbers')context.push((result.numberLength==='mixed'||!result.numberLength?'2–4':result.numberLength)+translate(" cijfers"));
   else if(result.numbers && result.mode!=='custom')context.push('+123');
   if(result.punctuation && result.mode!=='custom'&&result.mode!=='numbers')context.push(translate("leestekens"));
@@ -540,12 +703,15 @@ function showResult(result,preserveView=false){
   $('result-raw').textContent=Math.round(result.raw);$('result-consistency').textContent=result.consistency===null?'—':Math.round(result.consistency)+'%';
   $('result-cpm').textContent=Math.round(result.cpm);$('result-kph').textContent=resultKPH(result).toLocaleString(uiLocale());$('result-typos').textContent=result.typos;$('result-uncorrected').textContent=result.uncorrected;
   $('result-keystroke').textContent=fmtPercent(result.keystrokeAccuracy);$('result-corrections').textContent=translate('result.corrections',{corrected:result.corrected,typos:result.typos});
-  $('chart-wrap').hidden=!result.samples.length;$('result-legend').hidden=!result.samples.length;$('result-chart-empty').hidden=!!result.samples.length;
+  $('chart-wrap').hidden=!result.samples.length;$('result-legend').hidden=!result.samples.length;$('result-chart-empty').hidden=temporary||!!result.samples.length;
   $('weak-spots').hidden=!!result.summaryOnly&&!Object.keys(result.keys).length;
   $('practice-result-note').hidden=result.practiceGuideVersion!==1;
-  if(result.practiceGuideVersion===1)$('practice-result-note').textContent=translate('practice.result.note',{lesson:practiceLessonLabel(result.practiceLesson),guidance:translate(result.practiceAided?'practice.result.aided':'practice.result.unaided')});
+  if(result.practiceGuideVersion===1)$('practice-result-note').textContent=translate(temporary?'practice.summary.note':'practice.result.note',{lesson:practiceLessonLabel(result.practiceLesson),guidance:translate(result.practiceAided?'practice.result.aided':'practice.result.unaided')});
   $('chart-tooltip').hidden=true;if(result.samples.length)drawChart(result);drawWeakSpots(result);resultInsight(result);
-  renderBenchmark('result-benchmark',benchmarkModel(result),!preserveView);
+  renderBenchmark('result-benchmark',temporary?null:benchmarkModel(result),!preserveView);
+  for(const id of ['result-back','result-history-btn','view-progress-btn','copy-btn'])$(id).hidden=temporary;
+  // Do not persist weak-key targets derived from a private practice summary.
+  if(temporary)$('training-note').hidden=true;
   if(!preserveView){window.scrollTo({top:0,behavior:'instant'});$('again-btn').focus({preventScroll:true});}
 }
 
@@ -597,6 +763,7 @@ function benchmarkModel(r){
   if(!Number.isFinite(r.wpm)||r.wpm<0)return {...base,wpm:null,note:translate("Geen bruikbare snelheid beschikbaar.")};
   if(!isCompleteResult(r))return {...base,title:r.interrupted?translate("Test onderbroken"):translate("Verkorte test"),note:translate("Geen tempobeoordeling: rond een volledige test af zonder onderbreking.")};
   if(r.duration<15)return {...base,title:translate("Te korte meting"),note:translate("Minder dan 15 seconden: onvoldoende voor deze tempo-indicatie.")};
+  if(isCode(r))return {...base,title:translate('code.label'),note:translate('code.benchmark')};
   if(r.mode==='custom')return {...base,title:translate("Eigen tekst"),note:translate("Teksten verschillen in moeilijkheid. Je snelheid blijft zichtbaar, maar krijgt geen algemeen tempolabel.")};
   if(isAdaptive(r))return {...base,title:translate('adaptive.noBenchmark'),note:translate('adaptive.noBenchmark.note')};
   if(r.mode==='numbers'||r.mode==='practice'){
@@ -715,6 +882,7 @@ const FINGER_LAYOUT=[
  ['Rechter wijsvinger','6^7&yuhjnm'],['Rechter middelv.','8*ik,<'],['Rechter ringvinger','9(ol.>'],['Rechter pink',"{}0)p;:/?[-_=+]'\"\\|"],['Duimen',' ']
 ];
 function fingerFor(key,config=null){
+  if(key==='\n')return 'practice.finger.rp';
   if(isNumpad(config)){
     if(key===' ')return 'numpad.separator'; // Enter and Space are equivalent; actual fingers are unknown.
     const entry=NUMPAD_CHARACTERS.get(key),finger=COACH_FINGERS.find(f=>f.id===entry?.key.finger);
@@ -742,7 +910,7 @@ function drawWeakSpots(result){
   const sorted=Object.entries(fingers).filter(([,v])=>v.errors).sort((a,b)=>b[1].errors-a[1].errors);
   $('finger-bars').innerHTML=sorted.map(([name,v])=>bar(translate(name),v.errors,v.attempts,sorted[0][1].errors,true)).join('');
   const candidates=entries.filter(([key])=>/^[a-zà-ž]$/i.test(key)).slice(0,3).map(([key])=>key.toLowerCase());
-  $('training-note').hidden=!candidates.length || result.mode==='custom' || result.mode==='numbers';
+  $('training-note').hidden=!candidates.length || result.mode==='custom' || result.mode==='numbers' || isCode(result);
   if(candidates.length){$('training-message').textContent=translate("Gericht oefenen met woorden met ")+candidates.join(' · ')+'.';$('training-btn').onclick=()=>{settings.language=result.language;settings.keyboardLayout=layoutId(result);settings.standardTest=false;mode='practice';practiceKeys=candidates;settings.practiceLesson='weak';settings.practiceKeys=[...candidates];persistSettings();newTest();};}
 }
 
@@ -754,8 +922,8 @@ function selectHelpTab(tab){document.querySelectorAll('[data-help-tab]').forEach
 function downloadFile(text,name,type){const blob=new Blob([text],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);}
 function exportHistory(){
   // CSV schema stays language-neutral/stable for round-trip compatibility.
-  const header=['datum','taal','modus','duur_seconden','ingestelde_duur','WPM','raw_WPM','CPM','eindnauwkeurigheid_pct','aanslagnauwkeurigheid_pct','consistency_pct','typefouten','ongecorrigeerd','verwijderde_typefouten','getallen','leestekens','einde','onderbroken','cijferlengte','oefening','vingergids_versie','oefentoetsen','aanslaghulp','hoofdletters','cijfertoetsenbord','hoofdletterpositie','KPH','toetsindeling','standaard_versie','corpus_sha256','score_versie','adaptief_versie'];
-  const rows=historySelection().map(r=>[r.date,r.language,r.mode,r.duration,r.plannedDuration,r.wpm,r.raw,r.cpm,r.accuracy,r.keystrokeAccuracy,r.consistency??'',r.typos,r.uncorrected,r.corrected,r.numbers,r.punctuation,r.reason,r.interrupted,r.mode==='numbers'?(r.numberLength||'mixed'):'',r.practiceLesson||'',r.practiceGuideVersion||'',(r.practiceKeys||[]).join('/'),r.practiceGuideVersion===1?String(!!r.practiceAided):r.mode==='numbers'?String(!!r.numberAided):'',usesCapitalization(r),r.mode==='numbers'?(r.numberKeyboard||'row'):'',usesCapitalization(r)?(r.capitalPlacement||'mixed'):'',resultKPH(r),r.keyboardLayout||'',r.standardVersion||'',r.corpusFingerprint||'',r.scoringVersion||'',r.adaptiveVersion||'']);
+  const header=['datum','taal','modus','duur_seconden','ingestelde_duur','WPM','raw_WPM','CPM','eindnauwkeurigheid_pct','aanslagnauwkeurigheid_pct','consistency_pct','typefouten','ongecorrigeerd','verwijderde_typefouten','getallen','leestekens','einde','onderbroken','cijferlengte','oefening','vingergids_versie','oefentoetsen','aanslaghulp','hoofdletters','cijfertoetsenbord','hoofdletterpositie','KPH','toetsindeling','standaard_versie','corpus_sha256','score_versie','adaptief_versie','woordenlijst_versie','woordenlijst_sha256','code_versie','code_sha256','code_aanslaghulp'];
+  const rows=historySelection().map(r=>[r.date,r.language,r.mode,r.duration,r.plannedDuration,r.wpm,r.raw,r.cpm,r.accuracy,r.keystrokeAccuracy,r.consistency??'',r.typos,r.uncorrected,r.corrected,r.numbers,r.punctuation,r.reason,r.interrupted,r.mode==='numbers'?(r.numberLength||'mixed'):'',r.practiceLesson||'',r.practiceGuideVersion||'',(r.practiceKeys||[]).join('/'),r.practiceGuideVersion===1?String(!!r.practiceAided):r.mode==='numbers'?String(!!r.numberAided):'',usesCapitalization(r),r.mode==='numbers'?(r.numberKeyboard||'row'):'',usesCapitalization(r)?(r.capitalPlacement||'mixed'):'',resultKPH(r),r.keyboardLayout||'',r.standardVersion||'',r.corpusFingerprint||'',r.scoringVersion||'',r.adaptiveVersion||'',r.wordCorpusVersion||'',r.wordCorpusFingerprint||'',r.codeVersion||'',r.codeCorpusFingerprint||'',isCode(r)?String(!!r.codeAided):'']);
   const csv=[header,...rows].map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\r\n');
   downloadFile('\ufeff'+csv,'typetest-geschiedenis-'+new Date().toISOString().slice(0,10)+'.csv','text/csv;charset=utf-8');
 }
@@ -768,26 +936,29 @@ async function copyResult(){
 }
 
 /* ===================== Comparable progress, local only ===================== */
-function resultLanguage(r){if(guidedDrill(r))return layoutLabel(r);return r.mode==='numbers'?translate("Getallen"):languageName(r.language);}
-function isCompleteResult(r){return !r.interrupted && (r.reason==='time' || (r.mode==='custom' && r.reason==='text'));}
+function resultLanguage(r){if(isCode(r))return codeName(r.language);if(guidedDrill(r))return layoutLabel(r);return r.mode==='numbers'?translate("Getallen"):languageName(r.language);}
+function isCompleteResult(r){return !isInfinitePractice(r)&&r.ephemeral!==true&&!r.interrupted && (r.reason==='time' || (r.mode==='custom' && r.reason==='text'));}
 function profileKey(r){
   const m=r.mode||'words',duration=r.plannedDuration||Math.round(r.duration||settings.duration),layout=layoutId(r);
   const caseKey=usesCapitalization(r)?(!r.punctuation&&r.capitalPlacement==='initial'?'|capitals-initial':'|capitals-v1'):'';
+  if(isCode(r))return ['code-v1',r.language,layout,duration,r.codeCorpusFingerprint||'unknown',Number(!!r.codeAided)].join('|');
   if(isStandard(r))return ['standard-v1',r.language,layout,r.corpusFingerprint,r.scoringVersion||'ritme-output-v1',60].join('|');
-  if(m==='practice'&&r.practiceGuideVersion===1)return ['practice-v1',r.practiceLesson,guidedDrill(r)?'qwerty-us':r.language,duration,Number(!!r.numbers),Number(!!r.punctuation),(r.practiceKeys||[]).slice().sort().join(''),Number(!!r.practiceAided)].join('|')+caseKey+(layout==='us'?'':'|layout-'+layout)+(isAdaptive(r)?'|adaptive-v1':'');
+  if(m==='practice'&&r.practiceGuideVersion===1)return ['practice-v1',r.practiceLesson,guidedDrill(r)?'qwerty-us':r.language,duration,Number(!!r.numbers),Number(!!r.punctuation),(r.practiceKeys||[]).slice().sort().join(''),Number(!!r.practiceAided)].join('|')+caseKey+(layout==='us'?'':'|layout-'+layout)+(isAdaptive(r)?'|adaptive-v1':'')+corpusProfileSuffix(r);
   if(m==='numbers')return `numbers|${r.numberLength||'mixed'}|${duration}`+(isNumpad(r)?'|numpad|'+Number(!!r.numberAided):(layout==='us'?'':'|layout-'+layout));
-  return [m,r.language,duration,m==='custom'?0:Number(!!r.numbers),m==='custom'?0:Number(!!r.punctuation),m==='practice'?(r.practiceKeys||[]).slice().sort().join(''):'' ].join('|')+caseKey+(layout==='us'?'':'|layout-'+layout);
+  return [m,r.language,duration,m==='custom'?0:Number(!!r.numbers),m==='custom'?0:Number(!!r.punctuation),m==='practice'?(r.practiceKeys||[]).slice().sort().join(''):'' ].join('|')+caseKey+(layout==='us'?'':'|layout-'+layout)+corpusProfileSuffix(r);
 }
 function profileLabel(r){
   const d=(r.plannedDuration||Math.round(r.duration))+'s';
   if(r.mode==='numbers')return translate('profile.numbers',{digits:r.numberLength==='mixed'||!r.numberLength?'2–4':r.numberLength})+' · '+d+' · '+numericLayoutLabel(r)+(isNumpad(r)?' · '+translate(r.numberAided?'practice.result.aided':'practice.result.unaided'):'');
   let out=`${resultLanguage(r)} · ${resultModeLabel(r)} · ${d}`;
-  if(r.mode!=='custom'&&!guidedDrill(r))out+=r.punctuation?translate(" · leestekens"):translate(" · zonder leestekens");
+  if(r.mode!=='custom'&&!isCode(r)&&!guidedDrill(r))out+=r.punctuation?translate(" · leestekens"):translate(" · zonder leestekens");
   if(r.numbers && r.mode!=='numbers' && r.mode!=='custom')out+=' · +123';
   if(usesCapitalization(r))out+=' · '+translate(!r.punctuation&&r.capitalPlacement!=='initial'?'capitals.legacy':'capitals.label');
   if(r.mode==='practice'&&(r.practiceKeys||[]).length)out+=' · '+r.practiceKeys.join('/');
   if(r.mode!=='numbers')out+=' · '+layoutLabel(r);
   if(isStandard(r))out+=' · '+(r.corpusFingerprint||'').slice(0,8);
+  if(hasWordCorpus(r)&&!isStandard(r))out+=' · '+corpusLabel(r);
+  if(isCode(r))out+=' · '+translate(r.codeAided?'practice.result.aided':'practice.result.unaided');
   if(r.practiceGuideVersion===1)out+=' · '+translate(r.practiceAided?'practice.result.aided':'practice.result.unaided');
   return out;
 }
@@ -868,11 +1039,12 @@ function renderHistory(){
     const tr=document.createElement('tr'),date=new Date(r.date);
     const dateLabel=date.toLocaleDateString(uiLocale(),{day:'numeric',month:'short'}),time=date.toLocaleTimeString(uiLocale(),{hour:'2-digit',minute:'2-digit'});
     let flags=`${Math.round(r.duration)}s`;
-    if(r.mode!=='numbers'&&r.mode!=='custom')flags+=r.punctuation?translate(" · leestekens"):translate(" · woorden");
+    if(hasWordCorpus(r)&&!isStandard(r))flags+=' · '+corpusLabel(r);
+    if(r.mode!=='numbers'&&r.mode!=='custom'&&!isCode(r))flags+=r.punctuation?translate(" · leestekens"):translate(" · woorden");
     if(usesCapitalization(r))flags+=' · '+translate('capitals.label');
     if(r.reason==='manual')flags+=translate(" · verkort");if(r.interrupted)flags+=translate(" · onderbroken");
     if(r.summaryOnly)flags+=translate(" · geïmporteerd");
-    const modeName=r.mode==='numbers'?translate('profile.numbers',{digits:r.numberLength==='mixed'||!r.numberLength?'2–4':r.numberLength}):`${resultLanguage(r)}${r.mode==='custom'?translate(" · tekst"):r.mode==='practice'?translate(" · oefening"):''}`;
+    const modeName=r.mode==='numbers'?translate('profile.numbers',{digits:r.numberLength==='mixed'||!r.numberLength?'2–4':r.numberLength}):`${resultLanguage(r)}${r.mode==='custom'?translate(" · tekst"):r.mode==='practice'?translate(" · oefening"):isCode(r)?' · '+translate('code.label'):''}`;
     tr.innerHTML=`<td class="history-date">${safeText(dateLabel)}<span>${safeText(time)}</span></td><td class="history-mode">${safeText(modeName)}<small>${safeText(flags)}</small></td><td class="num history-wpm">${Math.round(r.wpm)}</td><td class="num">${fmtPercent(r.accuracy)}</td><td class="num history-extra">${fmtPercent(r.keystrokeAccuracy)}</td><td></td>`;
     tr.title=profileLabel(r);
     const actions=document.createElement('div');actions.className='row-actions';
@@ -981,9 +1153,12 @@ function resultInsight(r){
 
 /* ==================== Backups and legacy CSV migration ==================== */
 function validResult(r){
-  if(!r||typeof r!=='object'||isInfinitePractice(r)||r.version!==1||!Number.isFinite(r.wpm)||r.wpm<0||r.wpm>100000)return false;
+  if(!r||typeof r!=='object'||isInfinitePractice(r)||r.ephemeral===true||r.version!==1||!Number.isFinite(r.wpm)||r.wpm<0||r.wpm>100000)return false;
   if(!Number.isFinite(r.duration)||r.duration<=0||r.duration>86400||!Number.isFinite(Date.parse(r.date)))return false;
-  if(!['words','numbers','custom','practice'].includes(r.mode)||!(r.mode==='numbers'||LANGUAGES.includes(r.language)))return false;
+  if(!['words','numbers','custom','practice','code'].includes(r.mode)||!(r.mode==='numbers'||(isCode(r)?CODE_LANGUAGES.includes(r.language):LANGUAGES.includes(r.language))))return false;
+  if(isCode(r)&&(r.codeVersion!=='ritme-code-v1'||typeof r.codeCorpusFingerprint!=='string'||!/^[a-f0-9]{64}$/.test(r.codeCorpusFingerprint)||typeof r.codeAided!=='boolean'))return false;
+  if(r.wordCorpusVersion!==undefined&&!['ritme-basic-v1','ritme-expanded-v1'].includes(r.wordCorpusVersion))return false;
+  if(r.wordCorpusVersion==='ritme-expanded-v1'&&(!hasWordCorpus(r)||typeof r.wordCorpusFingerprint!=='string'||!/^[a-f0-9]{64}$/.test(r.wordCorpusFingerprint)))return false;
   if(r.keyboardLayout!==undefined&&!['us','de','fr'].includes(r.keyboardLayout))return false;
   if(r.standardVersion!==undefined&&(r.standardVersion!=='ritme-standard-v1'||r.mode!=='words'||r.plannedDuration!==60||r.numbers||r.punctuation||r.capitals||typeof r.corpusFingerprint!=='string'||!/^[a-f0-9]{64}$/.test(r.corpusFingerprint)))return false;
   if(r.standardVersion&&r.reason==='time'&&Math.abs(r.duration-60)>.01)return false;
@@ -1006,6 +1181,8 @@ function cleanImportedResult(r){
     reason:['time','text','manual'].includes(r.reason)?r.reason:'manual',interrupted:!!r.interrupted,consistency:r.consistency,
     summaryOnly:!!r.summaryOnly,practiceKeys:Array.isArray(r.practiceKeys)?r.practiceKeys.filter(k=>typeof k==='string'&&Array.from(k).length===1).slice(0,8):[],keys:{},samples:[],errors:[]};
   if(r.keyboardLayout)out.keyboardLayout=layoutId(r);
+  if(r.wordCorpusVersion){out.wordCorpusVersion=r.wordCorpusVersion;if(r.wordCorpusFingerprint)out.wordCorpusFingerprint=r.wordCorpusFingerprint;}
+  if(isCode(r)){out.codeVersion=r.codeVersion;out.codeCorpusFingerprint=r.codeCorpusFingerprint;out.codeAided=!!r.codeAided;out.scoringVersion='ritme-code-output-v1';out.numbers=false;out.punctuation=false;}
   if(isStandard(r)){out.standardVersion=r.standardVersion;out.corpusFingerprint=r.corpusFingerprint;out.scoringVersion='ritme-output-v1';}
   if(isAdaptive(r)){out.adaptiveVersion=1;out.adaptiveFocus=Array.isArray(r.adaptiveFocus)?r.adaptiveFocus.filter(k=>typeof k==='string'&&/^\p{L}{1,2}$/u.test(k)).slice(0,3):[];}
   out.pairs={};
@@ -1035,7 +1212,7 @@ function parseCSV(text){
   const num=v=>v===''||v===undefined?NaN:Number(String(v).replace(',','.'));
   return rows.map(cells=>{
     const o=Object.fromEntries(headers.map((h,i)=>[h,cells[i]??'']));
-    return {version:1,id:'csv-'+o.datum+'-'+o.WPM,date:o.datum,language:o.taal,mode:o.modus||'words',duration:num(o.duur_seconden),plannedDuration:num(o.ingestelde_duur),wpm:num(o.WPM),raw:num(o.raw_WPM),cpm:num(o.CPM),accuracy:num(o.eindnauwkeurigheid_pct),keystrokeAccuracy:num(o.aanslagnauwkeurigheid_pct),consistency:o.consistency_pct===''?null:num(o.consistency_pct),typos:num(o.typefouten),uncorrected:num(o.ongecorrigeerd),corrected:num(o.verwijderde_typefouten),numbers:o.getallen==='true',punctuation:o.leestekens==='true',capitals:o.hoofdletters==='true',capitalPlacement:o.hoofdletterpositie==='initial'?'initial':'mixed',numberKeyboard:o.cijfertoetsenbord==='numpad'?'numpad':'row',numberAided:o.cijfertoetsenbord==='numpad'&&o.aanslaghulp==='true',reason:o.einde||'time',interrupted:o.onderbroken==='true',numberLength:o.cijferlengte||'mixed',...(o.vingergids_versie==='1'?{practiceGuideVersion:1,practiceLesson:o.oefening,practiceAided:o.aanslaghulp==='true',practiceKeys:(o.oefentoetsen||'').split('/').filter(Boolean)}:{}),...(o.toetsindeling?{keyboardLayout:o.toetsindeling}:{}),...(o.standaard_versie?{standardVersion:o.standaard_versie,corpusFingerprint:o.corpus_sha256,scoringVersion:o.score_versie||'ritme-output-v1'}:{}),...(o.adaptief_versie?{adaptiveVersion:Number(o.adaptief_versie)}:{}),samples:[],errors:[],keys:{},summaryOnly:true};
+    return {version:1,id:'csv-'+o.datum+'-'+o.WPM,date:o.datum,language:o.taal,mode:o.modus||'words',duration:num(o.duur_seconden),plannedDuration:num(o.ingestelde_duur),wpm:num(o.WPM),raw:num(o.raw_WPM),cpm:num(o.CPM),accuracy:num(o.eindnauwkeurigheid_pct),keystrokeAccuracy:num(o.aanslagnauwkeurigheid_pct),consistency:o.consistency_pct===''?null:num(o.consistency_pct),typos:num(o.typefouten),uncorrected:num(o.ongecorrigeerd),corrected:num(o.verwijderde_typefouten),numbers:o.getallen==='true',punctuation:o.leestekens==='true',capitals:o.hoofdletters==='true',capitalPlacement:o.hoofdletterpositie==='initial'?'initial':'mixed',numberKeyboard:o.cijfertoetsenbord==='numpad'?'numpad':'row',numberAided:o.cijfertoetsenbord==='numpad'&&o.aanslaghulp==='true',reason:o.einde||'time',interrupted:o.onderbroken==='true',numberLength:o.cijferlengte||'mixed',...(o.vingergids_versie==='1'?{practiceGuideVersion:1,practiceLesson:o.oefening,practiceAided:o.aanslaghulp==='true',practiceKeys:(o.oefentoetsen||'').split('/').filter(Boolean)}:{}),...(o.toetsindeling?{keyboardLayout:o.toetsindeling}:{}),...(o.standaard_versie?{standardVersion:o.standaard_versie,corpusFingerprint:o.corpus_sha256,scoringVersion:o.score_versie||'ritme-output-v1'}:{}),...(o.adaptief_versie?{adaptiveVersion:Number(o.adaptief_versie)}:{}),...(o.woordenlijst_versie?{wordCorpusVersion:o.woordenlijst_versie,wordCorpusFingerprint:o.woordenlijst_sha256||undefined}:{}),...(o.code_versie?{codeVersion:o.code_versie,codeCorpusFingerprint:o.code_sha256,codeAided:o.code_aanslaghulp==='true'}:{}),samples:[],errors:[],keys:{},summaryOnly:true};
   });
 }
 function backupHistory(){downloadFile(JSON.stringify({format:'ritme-backup',version:3,exportedAt:new Date().toISOString(),settings:{...settings},results:history},null,2),'ritme-backup-'+new Date().toISOString().slice(0,10)+'.json','application/json');$('manage-menu').open=false;}
@@ -1160,9 +1337,9 @@ const NUMPAD_KEYS=[
 const NUMPAD_CHARACTERS=new Map(NUMPAD_KEYS.filter(k=>/^[0-9]$/.test(k.plain)).map(key=>[key.plain,{key,shift:false}]));
 NUMPAD_CHARACTERS.set(' ',{key:NUMPAD_KEYS.find(k=>k.code==='NumpadEnter'),shift:false});
 function isNumpad(config){return config?.mode==='numbers'&&config.numberKeyboard==='numpad';}
-function guideEnabled(){return mode==='practice'||isNumpad(session?.config);}
+function guideEnabled(){return mode==='practice'||isNumpad(session?.config)||(mode==='code'&&settings.codeGuide);}
 function guideKeys(){return isNumpad(session?.config)?NUMPAD_KEYS:COACH_KEYS;}
-function guideEntry(ch){return (isNumpad(session?.config)?NUMPAD_CHARACTERS:COACH_CHARACTERS).get(ch);}
+function guideEntry(ch){if(ch==='\n')return {key:COACH_KEY_BY_CODE.get('Enter'),shift:false};return (isNumpad(session?.config)?NUMPAD_CHARACTERS:COACH_CHARACTERS).get(ch);}
 function guideFingers(){return isNumpad(session?.config)?COACH_FINGERS.filter(f=>['ri','rm','rr','rp','th'].includes(f.id)):COACH_FINGERS;}
 function guideLabel(key){return key.code==='NumpadEnter'?'Enter':key.code==='Space'?translate('Space'):key.plain;}
 function guideFingerKeys(finger){return guideKeys().filter(k=>k.finger===finger.id&&!k.unused&&(k.code==='NumpadEnter'||(k.plain.length===1&&!['Backspace','Tab','CapsLock','Enter'].includes(k.code))));}
@@ -1262,12 +1439,12 @@ function renderCoach(){
  if(!session?.running)$('practice-lesson').style.width=Math.min(215,Math.max(95,($('practice-lesson').selectedOptions[0]?.textContent.length||12)*6.6+24))+'px';
  if(enabled)updateCoachTarget();
 }
-function expectedPracticeChar(){const w=session?.current;return w?(w.chars[w.input.length]??' '):null;}
+function expectedPracticeChar(){const w=session?.current;return w?(w.chars[w.input.length]??(isCode(session?.config)?'\n':' ')):null;}
 function updateCoachTarget(){
  if(!guideEnabled()||!session||$('test-view').hidden||!(settings.practiceKeyboard||settings.practiceColors))return;
  const ch=expectedPracticeChar(),entry=guideEntry(ch),finger=entry?COACH_FINGERS.find(f=>f.id===entry.key.finger):null;
  const line=$('coach-target');line.removeAttribute('data-finger');if(finger)line.dataset.finger=finger.id;
- $('coach-target-key').textContent=ch===' '?translate(isNumpad(session.config)?'numpad.next':'Space'):(ch??'');
+ $('coach-target-key').textContent=ch===' '?translate(isNumpad(session.config)?'numpad.next':'Space'):(ch==='\n'?'Enter ↵':ch??'');
  $('coach-target-finger').textContent=finger?fingerTitle(finger)+' · '+finger.code:translate('practice.accent');
  let shiftKey=null;
  if(entry?.shift){shiftKey=entry.key.finger?.startsWith('l')?'ShiftRight':'ShiftLeft';}
@@ -1314,8 +1491,9 @@ function handleCoachKeydown(event){
 function togglePracticeVisual(key){
  settings[key]=!settings[key];persistSettings();
  if(session?.config.mode==='practice')session.config.practiceAided=session.running?!!(session.config.practiceAided||settings.practiceKeyboard||settings.practiceColors):!!(settings.practiceKeyboard||settings.practiceColors);
+ if(isCode(session?.config))session.config.codeAided=session.running?!!(session.config.codeAided||(settings.codeGuide&&(settings.practiceKeyboard||settings.practiceColors))):!!(settings.codeGuide&&(settings.practiceKeyboard||settings.practiceColors));
  if(isNumpad(session?.config))session.config.numberAided=session.running?!!(session.config.numberAided||settings.practiceKeyboard||settings.practiceColors):!!(settings.practiceKeyboard||settings.practiceColors);
- renderCoach();updatePersonalBest();focusTyping();
+ renderCoach();renderTestInfo();updatePersonalBest();focusTyping();
 }
 function startPractice(){settings.standardTest=false;mode='practice';practiceKeys=[...(settings.practiceKeys||[])];if(settings.practiceLesson==='weak'&&!practiceKeys.length)settings.practiceLesson='words';newTest();}
 function printFingerCard(){
@@ -1363,7 +1541,7 @@ function adaptiveEvidence(config,live=null){
 }
 function adaptivePlan(config,live=null){
  const {evidence,tests}=adaptiveEvidence(config,live);
- const corpus=LEXICONS[config.language].words.map(w=>w.toLowerCase());
+ const corpus=selectedWordCorpus(config).words.map(w=>w.toLowerCase());
  const candidates=[];
  for(const [token,data] of evidence){
    const pair=Array.from(token).length===2,minimum=pair?8:20;
@@ -1393,7 +1571,7 @@ function makeAdaptiveWords(config,count,state){
  // Use live evidence only for THIS session; never leak the previous test's state.
  const live=session?.config===config?session:null,plan=adaptivePlan(config,live);
  config.adaptiveVersion=1;config.adaptiveFocus=plan.targets.map(t=>t.token);
- const corpus=LEXICONS[config.language].words;
+ const corpus=selectedWordCorpus(config).words;
  const result=[];
  for(let i=0;i<count;i++){
    // Independent 2/3 focus chance, then weighted observed target -> dataset index.
@@ -1421,20 +1599,27 @@ for(const [code,data] of Object.entries(LEXICONS)){
   const link=document.createElement('a');link.href=data.source;link.target='_blank';link.rel='noopener noreferrer';link.dataset.languageSource=code;link.textContent=translate('source.items',{language:languageName(code),count:data.words.length});$('source-list').append(link);
 }
 const randomOption=document.createElement('option');randomOption.value='random';randomOption.textContent=translate("Willekeurige taal");$('language').append(randomOption);
+for(const [lang,corpus] of Object.entries(EXPANDED_LEXICONS)){
+ const a=document.createElement('a');a.href=corpus.source;a.target='_blank';a.rel='noopener noreferrer';a.textContent=LEXICONS[lang].name+' · '+corpus.words.length+' · Faker / Monkeytype';$('extended-source-list').append(a);
+}
 $('license-text').textContent=RITME_DATA.license;
 $('benchmark-band-rows').innerHTML=SPEED_BANDS.map(b=>`<tr><td>${safeText(translate(b.label))}</td><td>${bandRange(b)}</td><td>${bandRange(b,5)}</td></tr>`).join('');
 $('language').addEventListener('change',()=>{if(standardActive())settings.standardLanguage=$('language').value;else settings.language=$('language').value;practiceKeys=[];if(mode==='practice'&&settings.practiceLesson==='weak'){settings.practiceLesson='words';settings.practiceKeys=[];}persistSettings();newTest();});
 document.querySelectorAll('[data-duration]').forEach(b=>b.onclick=()=>{
   if(session?.running||standardActive())return;
   if(b.dataset.duration==='infinite'){
-    if(mode!=='practice')return;
-    settings.practiceInfinite=true;
+    if(!['practice','code'].includes(mode))return;
+    if(mode==='code')settings.codeInfinite=true;else settings.practiceInfinite=true;
   }else{
     const duration=Number(b.dataset.duration);if(![15,30,60,120].includes(duration))return;
-    settings.duration=duration;if(mode==='practice')settings.practiceInfinite=false;
+    settings.duration=duration;if(mode==='practice')settings.practiceInfinite=false;if(mode==='code')settings.codeInfinite=false;
   }
   persistSettings();newTest();
 });
+$('code-btn').onclick=()=>{if(session?.running)return;mode='code';practiceKeys=[];newTest();};
+$('code-language').onchange=()=>{if(session?.running||!CODE_LANGUAGES.includes($('code-language').value))return;settings.codeLanguage=$('code-language').value;persistSettings();newTest();};
+$('word-corpus').onchange=()=>{if(session?.running||standardActive())return;settings.wordCorpus=$('word-corpus').value==='basic'?'basic':'expanded';persistSettings();newTest();toggleTestInfo();};
+$('code-guide-btn').onclick=()=>{settings.codeGuide=!settings.codeGuide;persistSettings();if(isCode(session?.config))session.config.codeAided=session.running?session.config.codeAided||(settings.codeGuide&&(settings.practiceKeyboard||settings.practiceColors)):settings.codeGuide&&(settings.practiceKeyboard||settings.practiceColors);renderCoach();renderTestInfo();updatePersonalBest();};
 $('numbers-btn').onclick=()=>{mode='numbers';practiceKeys=[];newTest();};
 $('mix-numbers-btn').onclick=()=>{settings.numbers=!settings.numbers;persistSettings();newTest();};
 $('number-length').onchange=()=>{settings.numberLength=$('number-length').value;persistSettings();newTest();};
@@ -1492,7 +1677,7 @@ $('capture').addEventListener('keydown',event=>{
   $('caps-warning').hidden=!event.getModifierState('CapsLock');handleCoachKeydown(event);
   if(event.isComposing || event.key==='Dead' || event.key==='Process')return;
   if(event.key==='Backspace'){event.preventDefault();eraseInput(event.ctrlKey||event.altKey||event.metaKey);return;}
-  if(event.key==='Enter'){event.preventDefault();insertText(' ');return;}
+  if(event.key==='Enter'){event.preventDefault();insertText(isCode(session?.config)?'\n':' ');return;}
   if(event.key==='Delete'){event.preventDefault();return;}
   // Prevent changing hidden-input selection or submitting keyboard shortcuts as text.
   if((event.ctrlKey||event.metaKey) && ['a','z','y','x'].includes(event.key.toLowerCase()))event.preventDefault();
@@ -1503,7 +1688,7 @@ $('capture').addEventListener('beforeinput',event=>{
   if(['insertFromPaste','insertFromDrop','insertReplacementText'].includes(event.inputType)){event.preventDefault();toast(translate("Typ de tekst zelf; plakken en automatische vervanging zijn uitgeschakeld."));return;}
   if(event.inputType==='deleteContentBackward'){event.preventDefault();eraseInput();}
   if(event.inputType==='deleteWordBackward'){event.preventDefault();eraseInput(true);}
-  if(event.inputType==='insertLineBreak'){event.preventDefault();insertText(' ');}
+  if(event.inputType==='insertLineBreak'||event.inputType==='insertParagraph'){event.preventDefault();insertText(isCode(session?.config)?'\n':' ');}
 });
 $('capture').addEventListener('paste',event=>{event.preventDefault();toast(translate("Plakken is uitgeschakeld tijdens de typetest."));});
 $('capture').addEventListener('drop',event=>event.preventDefault());
@@ -1578,9 +1763,11 @@ function renderTestInfo(){
   else if(mode==='custom')context.push(translate('Eigen tekst'));
   context.push(infinite?'∞':config.duration+'s');if(isStandard(config))context.push(translate('standard.heading'));
   $('test-info-context').textContent=context.join(' · ');
-  const intro=mode==='custom'?'test.info.custom':numbers?(isNumpad(config)?'test.info.numpad':'test.info.numbers'):practice?'test.info.practice':'test.info.words';
+  const intro=isCode(config)?'code.info':mode==='custom'?'test.info.custom':numbers?(isNumpad(config)?'test.info.numpad':'test.info.numbers'):practice?'test.info.practice':'test.info.words';
   $('test-info-intro').textContent=translate(intro);
   $('test-info-drill').hidden=!guidedDrill(config);
+  $('test-info-feedback').hidden=!(practice||isCode(config));
+  renderContentInfo(config);
   $('test-info-capitals').hidden=!usesCapitalization(config);
   $('test-info-guidance').hidden=!guide;
   $('test-info-time').hidden=infinite;
@@ -1590,6 +1777,23 @@ function renderTestInfo(){
   updateAdaptiveInfo();
   if(!$('test-info-panel').hidden)requestAnimationFrame(positionTestInfo);
 }
+
+function renderContentInfo(config){
+  const word=hasWordCorpus(config),standard=isStandard(config);
+  $('test-info-corpus').hidden=!word;
+  $('word-corpus').value=standard?'basic':settings.wordCorpus;$('word-corpus').disabled=standard||!!session?.running;
+  if(word){const corpus=selectedWordCorpus(config);$('corpus-detail').textContent=translate(standard?'corpus.standard':'corpus.detail',{count:formatNumber(corpus.words.length)});}
+  $('test-info-code').hidden=!isCode(config);
+  if(isCode(config)){
+    $('code-guide-btn').setAttribute('aria-pressed',String(settings.codeGuide));
+    $('code-detail').textContent=translate('code.detail',{count:CODE_CORPORA[config.language].snippets.length});
+    $('code-source-links').replaceChildren();
+    for(const url of new Set(CODE_CORPORA[config.language].snippets.map(s=>s.source))){
+      const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=url.includes('python.org')?'Python documentation':url.split('/').at(-1).replaceAll('_',' ');$('code-source-links').append(a);
+    }
+  }
+}
+
 function positionTestInfo(){
   const panel=$('test-info-panel');if(panel.hidden)return;
   const icon=$('test-info-btn').getBoundingClientRect();

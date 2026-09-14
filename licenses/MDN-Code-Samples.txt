@@ -1,0 +1,38 @@
+MDN Web Docs code samples
+Attribution: individual Mozilla / MDN contributors.
+Original source URLs for every bundled snippet are retained in data.js.
+
+MDN's published code-sample policy distinguishes samples introduced on/after
+20 August 2010 (CC0) from older samples (MIT). Its policy also notes that the
+current site does not expose enough history to determine this per sample.
+This distribution therefore retains source attribution and the MIT terms
+below, rather than asserting that every historical sample is definitely CC0.
+No MDN article prose, logos or website design are included in the code corpus.
+
+Policy: https://developer.mozilla.org/en-US/docs/MDN/Writing_guidelines/Attrib_copyright_license
+CC0: https://creativecommons.org/publicdomain/zero/1.0/
+
+For CC0 code samples:
+Any copyright is dedicated to the Public Domain:
+https://creativecommons.org/publicdomain/zero/1.0/
+
+For historical MIT code samples:
+Copyright remains with the individual MDN contributors credited by the source.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.

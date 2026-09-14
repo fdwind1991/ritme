@@ -868,3 +868,36 @@ dialog::backdrop { background:#352a2138; backdrop-filter:blur(5px); -webkit-back
 /* Static dialog size, extracted from the single-file markup. */
 #confirm-dialog { width:430px; }
 .no-script-note { margin:0 auto 24px; max-width:60ch; padding:0 24px; text-align:center; color:var(--muted); }
+
+/* Practice feedback: one live line, a temporary summary, no extra cards. */
+.live-metrics { font-variant-numeric:tabular-nums; }
+#live-wpm { white-space:nowrap; }
+.practice-session-note { margin:16px 0 8px; color:var(--accent); font:10px/1.7 var(--mono); }
+.practice-session-detail { margin:8px 0 0; color:var(--muted); font:10px/1.8 var(--mono); }
+@media(max-width:420px) {
+  .practice-active .live-metrics { gap:8px; font-size:11px; }
+  .practice-active #live-wpm { font-size:10px; }
+  .practice-session-detail { font-size:9px; }
+}
+
+/* v3.2 — code and richer word corpora. The normal typing surface is unchanged. */
+.code-settings { display:flex; align-items:center; }
+.code-settings select { border:0; background:transparent; color:var(--accent); font:inherit; padding:5px 2px; cursor:pointer; }
+.code-active .typing-viewport { font-size:min(var(--type-size),24px); line-height:1.65; height:330px; }
+.code-active .word-track { padding-left:38px; }
+.code-active .code-line { display:block; position:relative; min-height:1.65em; white-space:pre-wrap; overflow-wrap:anywhere; }
+.code-active .code-line::before { content:attr(data-line); position:absolute; right:calc(100% + 13px); top:0; color:var(--faint); font-size:10px; line-height:calc(min(var(--type-size),24px)*1.65); text-align:right; pointer-events:none; }
+.code-active .char[data-space] { white-space:pre-wrap; }
+.code-active .char[data-space]::before { content:'·'; position:absolute; color:var(--faint); opacity:.45; pointer-events:none; }
+.code-active .char[data-space].incorrect::before { color:var(--error); opacity:1; }
+.code-active .gap { color:var(--faint); opacity:.5; white-space:pre; }
+.code-active .gap.current { opacity:1; color:var(--accent); }
+.code-active .gap.incorrect { opacity:1; color:var(--error); }
+.code-source-links { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:9px; margin-top:8px; }
+#code-guide-btn { padding:4px 0; }
+@media(max-width:600px){
+  .code-active .typing-viewport { font-size:18px; height:300px; }
+  .code-active .word-track { padding-left:24px; }
+  .code-active .code-line::before { right:calc(100% + 7px); line-height:29.7px; font-size:9px; }
+  .mode-group button { padding-left:5px; padding-right:5px; }
+}
