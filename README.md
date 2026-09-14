@@ -1,90 +1,259 @@
 # Ritme
 
-Een minimalistische typetrainer met woorden, cijfers, adaptieve aanslagoefeningen en persoonlijke voortgang. Gewone HTML, CSS en JavaScript: geen framework, package manager, buildstap of backend.
+A minimal, privacy-first typing trainer focused on accuracy, rhythm and deliberate practice.
 
-Deze repository-editie is gesplitst uit de laatste `typetest_updated.html`, inclusief de driedelige footer. De scoreberekeningen, testinstellingen, woordenlijsten, corpuscontrolecodes en bestaande sleutels voor browseropslag zijn behouden.
+Ritme started from the simplicity of traditional typing tests and expands on it with adaptive practice, keyboard guidance, multilingual typing, numpad training and local progress tracking — without turning the interface into a dashboard.
 
-## Bestanden
+**No account. No tracking. No backend. No build step.**
+
+---
+
+## Features
+
+- Timed typing tests: 15s, 30s, 60s and 120s
+- Standardized 60-second benchmark mode
+- Word tests in multiple languages
+- Numbers-only and numpad training
+- Capitalization and punctuation practice
+- Custom text mode
+- Adaptive practice based on weak keys and letter combinations
+- On-screen keyboard guidance
+- Finger-color training
+- QWERTY, QWERTZ and AZERTY layouts
+- WPM, CPM, KPH and accuracy metrics
+- Keystroke accuracy separate from final-text accuracy
+- Consistency and error analysis
+- Personal benchmarks and progress charts
+- Unlimited practice mode without saving a score
+- NL / ENG / DE interface
+- Light and dark mode
+- JSON backup and CSV export
+- Fully local browser storage
+
+---
+
+## Philosophy
+
+Most typing tests answer one question:
+
+> How fast can you type?
+
+Ritme is built around a broader one:
+
+> How well do you type, where do you lose speed, and how can you improve?
+
+The interface deliberately stays minimal. Advanced functionality only appears when it is relevant.
+
+**Accuracy first. Speed follows.**
+
+---
+
+## Screenshots
+
+_Add screenshots here._
+
+Suggested:
+
+```text
+screenshots/
+├── typing.png
+├── results.png
+├── practice.png
+└── progress.png
+```
+
+---
+
+## Run locally
+
+Ritme uses plain HTML, CSS and JavaScript.
+
+No npm install, package manager or build process is required.
+
+```bash
+git clone https://github.com/fdwind1991/ritme.git
+cd ritme
+python3 -m http.server 8000
+```
+
+Then open:
+
+```text
+http://localhost:8000
+```
+
+You can also open `index.html` directly, although a local web server provides more predictable browser-storage behaviour.
+
+---
+
+## Project structure
 
 ```text
 .
-├── index.html               # Paginastructuur, bediening, dialogen en footer
-├── styles.css               # Alle statische CSS, thema's en responsive regels
-├── app.js                   # Typetest, training, scores, grafieken en opslag
-├── data.js                  # Woordenlijsten, vertalingen, bestaande salt en licentietekst
-├── LICENSE                  # Bestaande volledige GNU GPL v3-licentie
-├── THIRD_PARTY_NOTICES.md    # Credits en bronvermeldingen
+├── index.html
+├── styles.css
+├── app.js
+├── data.js
+├── LICENSE
+├── THIRD_PARTY_NOTICES.md
 ├── README.md
-├── .gitignore               # Negeert lokale bestanden en persoonlijke exports
-└── .nojekyll                # Voor statische publicatie op GitHub Pages
+└── .nojekyll
 ```
 
-`index.html` laadt `styles.css` en vervolgens de twee JavaScript-bestanden met `defer`. `data.js` moet vóór `app.js` staan. Alle paden zijn relatief, zodat de app ook in een repository-submap kan staan. Er wordt geen data via `fetch()` opgehaald.
+### `index.html`
+Application structure, dialogs and accessible markup.
 
-## Lokaal starten
+### `styles.css`
+The complete visual system, responsive layout, themes and animations.
 
-Pak de hele map uit; houd de vier applicatiebestanden bij elkaar. Start vanuit deze map een lokale webserver, bijvoorbeeld met een reeds geïnstalleerde Python 3:
+### `app.js`
+Typing engine, scoring, practice logic, charts, progress tracking and local storage.
 
-```bash
-python3 -m http.server 8000 --bind 127.0.0.1
-```
+### `data.js`
+Translations, language datasets and embedded application data.
 
-Open daarna `http://127.0.0.1:8000` in je browser. Stop de server met `Ctrl+C`. De app heeft voor het oefenen geen internetdienst nodig: alle benodigde bestanden zitten in de map. Rechtstreeks openen van `index.html` kan ook, voor zover je browser lokale scripts en opslag toestaat; de lokale webserver is de voorspelbaardere ontwikkelroute.
+---
 
-## In een GitHub-repository plaatsen
+## Privacy
 
-Upload de **inhoud** van deze map naar de root van je repository. `index.html` moet dus direct in de repository staan, niet nog in een extra bovenliggende map. Upload geen persoonlijke historie-exports, back-ups of `.env`-bestanden.
+Ritme is designed to work without a backend.
 
-### Publiceren met GitHub Pages
+- No analytics
+- No trackers
+- No account
+- No external fonts
+- No typing data sent to a server
+- No full custom text stored in history
 
-Na het uploaden: **Settings → Pages → Build and deployment → Deploy from a branch**. Selecteer de branch met deze bestanden, bijvoorbeeld **main**, kies **/(root)** en klik **Save**. Er is geen eigen buildscript nodig. De Pages-instellingen tonen na de publicatie de website-URL.
+Settings, scores and aggregated typing statistics are stored locally in your browser.
 
-GitHub-documentatie: [publicatiebron instellen](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site). Beschikbaarheid kan afhangen van je abonnement en de zichtbaarheid van de repository; de documentatie vermeldt de voorwaarden. Een Pages-site kan publiek zijn, ook wanneer de bronrepository privé is.
+History can be exported as JSON or CSV and individual tests can be removed at any time.
 
-Deze download maakt geen repository aan en publiceert niets automatisch.
+When hosted through GitHub Pages, GitHub may process ordinary web requests according to its own privacy policy.
 
-## Je huidige voortgang meenemen
+---
 
-Maak in de oude app eerst een back-up via **Voortgang → Beheer → Back-up downloaden · JSON**. Open de nieuwe app en kies **Voortgang → Beheer → Importeer JSON of CSV**.
+## Progress & backups
 
-De bestaande opslagsleutels zijn bewust niet hernoemd:
+Typing history is stored in the browser.
 
-```text
-folkert-type-test-v1
-folkert-type-settings-v1
-```
+To move your progress between browsers or installations:
 
-De nieuwe bestandsnaam, een andere poort of een nieuw domein kan een andere browseropslag betekenen. Daarom reist je geschiedenis niet vanzelf van de oude lokale HTML naar GitHub Pages. JSON behoudt de beschikbare grafiekpunten en toetsstatistieken; CSV is beperkter. De bestaande grens van 100 opgeslagen tests is niet gewijzigd. Het ZIP-bestand bevat geen persoonlijke testresultaten.
+**Progress → Manage → Download backup · JSON**
 
-Let bij meerdere projecten op hetzelfde domein op: de applicatie gebruikt vaste opslagsleutels. Wijzig die alleen bewust, met een migratieplan voor bestaande gegevens.
+Then import that file in the new installation.
 
-## Aanpassen
+JSON preserves more detailed test data than CSV.
 
-Voor kleuren, typografie, afstanden en animaties wijzig je `styles.css`. De centrale kleurvariabelen staan bovenaan. Structuur en vaste elementen staan in `index.html`; de footer behoudt de bronvermelding links, de slogan in het midden en vier popupknoppen rechts.
+---
 
-Alle NL/ENG/DE-teksten staan in `RITME_DATA.messages` in `data.js`. Elementen gebruiken `data-i18n` of `data-i18n-html`. Pas voor gewijzigde standaardteksten ook de Nederlandse fallback in `index.html` aan. Teksten met HTML-markup zijn vertrouwde, meegeleverde inhoud: vul deze niet met onbeveiligde gebruikersinvoer.
+## Standard mode
 
-De ingebouwde woordenlijsten staan in `RITME_DATA.lexicons`. **Wijzig de woordenlijsten van Standard v1 niet ongemerkt**: hun controlecodes in `STANDARD_CORPORA` in `app.js` maken deel uit van het testprotocol. Een inhoudelijk gewijzigd protocol moet apart worden geversioneerd en vergeleken.
+Ritme includes a versioned **Standard · 60s** mode intended for more consistent comparisons over time.
 
-`RITME_DATA.entropy` is de ongewijzigde, openbare bouw-salt uit de vorige versie, geen wachtwoord of API-sleutel. De generator gebruikt daarnaast verse browserentropie. Een splitsing van bestanden vereist geen nieuwe salt.
+Standard mode fixes relevant test parameters so results from the same protocol version remain comparable.
 
-De kernfuncties en rekenregels staan in `app.js`. De uitgifte bevat geen npm-afhankelijkheden. Met een reeds geïnstalleerde Node.js kun je na eigen wijzigingen de syntaxis controleren:
+Changes that materially affect the protocol should therefore be introduced as a new version rather than silently changing the existing one.
 
-```bash
-node --check data.js
-node --check app.js
-```
+---
 
-## Privacy en hosting
+## Adaptive practice
 
-Ritme heeft geen analytics, trackers, externe fonts of API-aanroepen. De pagina laadt wel haar eigen HTML-, CSS- en JavaScript-bestanden. Scores en instellingen blijven in browseropslag; Ritme verstuurt die niet naar een server. Een hostingprovider verwerkt de gewone HTTP-verzoeken en kan toegangsgegevens loggen. [GitHub Pages vermeldt expliciet het loggen van IP-adressen voor beveiligingsdoeleinden](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages#data-collection).
+Adaptive practice uses your typing history to identify weaker keys and letter combinations.
 
-De volledige ingevoerde of geplakte tekst wordt niet in de geschiedenis bewaard. Scores, grafiekpunten en geaggregeerde toetsstatistieken wel. Maak eigen back-ups. Externe bronlinks openen andere websites met hun eigen voorwaarden.
+Practice material is then weighted toward those patterns while still drawing from the existing language datasets.
 
-Er is geen service worker toegevoegd: deze splitsing verandert de app niet in een installeerbare PWA en belooft geen offline herlaadbaarheid van een online gehoste pagina.
+As performance improves, that weighting decreases.
 
-## Credits en licentie
+The goal is not simply to generate harder text, but to spend more practice time where it is useful.
 
-Concept en visuele basis: [TypeSpeedTest.com](https://www.typespeedtest.com/). Ritme is zelfstandig uitgewerkt voor bredere functionaliteit en is geen officiële versie, samenwerking of goedgekeurde uitbreiding van TypeSpeedTest.com.
+---
 
-De bestaande GPL-3.0-licentie is behouden. De woordenlijsten zijn in de oorspronkelijke app toegeschreven aan de Monkeytype-bijdragers onder GPL-3.0. Zie [LICENSE](LICENSE) en [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) voor de volledige licentie en de overgenomen bronvermeldingen. Scores en benchmarks blijven indicatief; Ritme is geen gecertificeerde vaardigheidstest.
+## Keyboard training
+
+Ritme supports:
+
+- US QWERTY
+- German QWERTZ
+- French AZERTY
+- Numeric keypad training
+
+Practice mode can display:
+
+- the next key
+- suggested finger
+- opposite-hand Shift usage
+- finger colors
+- an on-screen keyboard
+
+Finger assignments are instructional recommendations; Ritme cannot determine which physical finger you actually used.
+
+---
+
+## Scoring
+
+Ritme separates two forms of accuracy.
+
+### Final accuracy
+
+Measures the correctness of the text that remains after corrections.
+
+### Keystroke accuracy
+
+Includes mistakes that were later corrected.
+
+This makes it possible to distinguish:
+
+> “I finished with perfect text”
+
+from:
+
+> “I typed it cleanly the first time.”
+
+Ritme also reports WPM, CPM, KPH, raw speed, consistency, corrected errors and remaining errors.
+
+Benchmarks are indicative and should not be interpreted as certified skill levels or population percentiles.
+
+---
+
+## Languages
+
+### Interface
+
+- Nederlands
+- English
+- Deutsch
+
+### Typing datasets
+
+Ritme contains multiple language datasets independent of the selected interface language.
+
+---
+
+## Credits
+
+Concept and visual foundation:
+
+[TypeSpeedTest.com](https://www.typespeedtest.com/)
+
+Ritme is an independent implementation created to explore broader typing-test and training functionality.
+
+It is **not affiliated with, sponsored by, maintained by or officially endorsed by TypeSpeedTest.com**.
+
+Language datasets originate from the Monkeytype project. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for attribution and source information.
+
+---
+
+## License
+
+Ritme is distributed under the **GNU General Public License v3.0**.
+
+See [`LICENSE`](LICENSE) for the full license text.
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome.
+
+When changing scoring, standardized tests or typing datasets, please document changes carefully so existing result comparisons remain meaningful.
