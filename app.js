@@ -1,5 +1,26 @@
 /* Ritme · application logic. GPL-3.0; see LICENSE. Load data.js first. */
 'use strict';
+// Fail visibly on incomplete/mixed deployments instead of exposing raw i18n keys.
+const APP_RELEASE = '3.2.1';
+if (typeof RITME_DATA === 'undefined' || RITME_DATA.release !== APP_RELEASE ||
+    !RITME_DATA.codeCorpora?.python || !RITME_DATA.expandedLexicons?.nl ||
+    !RITME_DATA.messages?.['code.label']?.nl) {
+  const lang = document.documentElement.lang;
+  const text = {
+    nl: ['De appbestanden zijn niet volledig bijgewerkt. Herlaad de pagina; je voortgang blijft bewaard.', 'Herlaad'],
+    en: ['The app files are not fully updated. Reload the page; your progress is kept.', 'Reload'],
+    de: ['Die App-Dateien sind nicht vollstaendig aktualisiert. Lade die Seite neu; dein Fortschritt bleibt erhalten.', 'Neu laden']
+  }[lang] || ['Please reload the page. Your progress is kept.', 'Reload'];
+  const box = document.getElementById('fatal-error');
+  if (box) {
+    box.hidden = false; box.setAttribute('role', 'alert'); box.textContent = text[0] + ' ';
+    const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = text[1];
+    retry.onclick = () => { const url = new URL(location.href); url.searchParams.set('v', APP_RELEASE); location.replace(url.href); };
+    box.append(retry);
+  }
+  throw new Error('Ritme asset version mismatch. Reload without clearing browser storage.');
+}
+
 /* ======================== Data, entropy and storage ======================== */
 const $ = (id) => document.getElementById(id);
 const LEXICONS = RITME_DATA.lexicons;

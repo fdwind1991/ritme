@@ -901,3 +901,11 @@ dialog::backdrop { background:#352a2138; backdrop-filter:blur(5px); -webkit-back
   .code-active .code-line::before { right:calc(100% + 7px); line-height:29.7px; font-size:9px; }
   .mode-group button { padding-left:5px; padding-right:5px; }
 }
+
+/* Compact content tabs. Full names are in translated titles/accessible labels. */
+.mode-group { flex-wrap:nowrap; }
+.mode-group button { text-transform:none; white-space:nowrap; min-width:42px; }
+@media(max-width:600px) {
+  .mode-group { gap:5px; }
+  .mode-group button { min-width:44px; min-height:36px; font-size:11px; padding-inline:9px; }
+}
