@@ -909,3 +909,43 @@ dialog::backdrop { background:#352a2138; backdrop-filter:blur(5px); -webkit-back
   .mode-group { gap:5px; }
   .mode-group button { min-width:44px; min-height:36px; font-size:11px; padding-inline:9px; }
 }
+
+/* v3.2.2: one activity selector; practice options are disclosed under information. */
+.language-row { gap:6px 14px; }
+.language-meta { flex:0 1 auto; }
+.word-activity-wrap { min-width:0; }
+#word-activity { width:auto!important; max-width:170px; }
+.word-options { display:flex; align-items:center; justify-content:center; gap:6px; min-width:0; }
+#word-options { margin:3px auto 0; }
+#word-options .option-toggle { white-space:nowrap; }
+.test-info-panel .word-options,.test-info-panel .practice-settings { justify-content:flex-start; margin:0; gap:6px 12px; }
+.tutorial-link { color:var(--muted); font-size:10px; padding:6px; }
+.tutorial-link:hover { color:var(--accent); }
+#code-tutorial-dialog { width:510px; }
+.tutorial-example { font:12px/1.7 var(--mono); white-space:pre; overflow-x:auto; max-width:100%; padding:8px 0; color:var(--strong); }
+.tutorial-steps { margin:15px 0; padding-left:21px; }
+.tutorial-steps li { padding-left:4px; margin-bottom:15px; }
+.tutorial-steps h3 { margin:0 0 3px; }
+.tutorial-steps p { margin:0; }
+/* A source newline is the only line break. Horizontal overflow stays in the editor. */
+.code-active .typing-viewport { height:var(--code-viewport-height,330px); overflow-x:auto; overflow-y:hidden; scrollbar-width:thin; scroll-behavior:auto; overscroll-behavior-x:contain; }
+.code-active .word-track { width:max-content; min-width:100%; padding-left:0; }
+.code-active .code-line { white-space:pre; overflow-wrap:normal; word-break:normal; }
+.code-active .code-line::before { display:none; }
+.code-active .char[data-space] { white-space:pre; }
+.code-line-number { position:sticky; left:0; z-index:1; display:inline-block; box-sizing:content-box; width:30px; padding-right:10px; color:var(--faint); background:var(--bg); font-size:10px; text-align:right; }
+@media(max-width:600px){
+  .language-row { flex-wrap:nowrap; gap:4px 8px; margin-top:5px; }
+  .language-wrap select { max-width:110px; }
+  #word-activity { max-width:140px; }
+  .test-actions { flex-shrink:0; }
+  .code-line-number { width:20px; padding-right:8px; font-size:9px; }
+  .code-active .typing-viewport { font-size:18px; }
+}
+@media(max-width:360px){
+  .language-row { gap:3px 5px; }
+  .language-wrap select { max-width:98px; }
+  #word-activity { max-width:116px; font-size:10px; }
+  .test-actions .reset-icon,.test-actions .info-icon { min-width:28px; padding-inline:6px; }
+  .tutorial-example { font-size:11px; }
+}
