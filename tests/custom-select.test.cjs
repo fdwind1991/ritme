@@ -13,11 +13,22 @@ test('all select controls share the custom listbox implementation',()=>{
   const selectIds=[...html.matchAll(/<select[^>]+id="([^"]+)"/g)].map(match=>match[1]);
   assert.ok(selectIds.length>=10);
   assert.match(app,/document\.querySelectorAll\('select'\)/);
+  assert.match(app,/function customSelectOptions\(select\)/);
+  assert.match(app,/Array\.from\(child\.children\)/);
+  assert.match(app,/customSelectLabel\(option\)/);
+  assert.match(app,/child\.dataset\.i18nLabel\?translate\(child\.dataset\.i18nLabel\)/);
+  assert.match(app,/document\.body\.append\(state\.menu\)/);
+  assert.match(app,/closest\('\.custom-select-menu'\)/);
   assert.match(app,/wrapper\.className='custom-select'/);
   assert.match(app,/menu\.setAttribute\('role','listbox'\)/);
   assert.match(app,/trigger\.setAttribute\('aria-haspopup','listbox'\)/);
   assert.match(styles,/\.custom-select-menu\{/);
+  assert.match(styles,/\.custom-select\.is-open\{z-index:10000;\}/);
+  assert.match(styles,/\.custom-select-menu\{position:absolute;z-index:2147483647;/);
+  assert.match(styles,/\.custom-select-chevron\{/);
   assert.match(styles,/\.custom-select-option\[aria-selected="true"\]::before/);
+  assert.match(styles,/\.custom-select-option:hover\{/);
+  assert.match(styles,/\.custom-select-option\[data-active="true"\]\{/);
 });
 
 test('custom selects support type-ahead and preserve native change events',()=>{

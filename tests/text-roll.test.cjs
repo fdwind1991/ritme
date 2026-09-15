@@ -12,7 +12,7 @@ test('new text sets roll into the typing viewport',()=>{
   assert.match(app,/function prepareTextRoll\(shouldAnimate\)/);
   assert.match(app,/current\.id='word-track-outgoing'/);
   assert.match(app,/incoming\.id='word-track'/);
-  assert.match(app,/prepareTextRoll\(wasTypingView\)/);
+  assert.match(app,/prepareTextRoll\(wasTypingView&&promptMode==='fresh'\)/);
   assert.match(styles,/\.word-track\.text-roll-out,\.word-track\.text-roll-in/);
   assert.match(styles,/@keyframes text-roll-out/);
   assert.match(styles,/@keyframes text-roll-in/);

@@ -139,29 +139,39 @@ function tp(key,count,values={}){return translate(key+(count===1?'.one':'.other'
 const customSelectStates=new Map();
 let openCustomSelect=null;
 function customSelectOptions(select){
-  return [...select.options].filter(option=>!option.hidden);
+  const options=[];
+  for(const child of Array.from(select.children)){
+    if(child.tagName==='OPTGROUP')options.push(...Array.from(child.children).filter(option=>option.tagName==='OPTION'&&!option.hidden));
+    else if(child.tagName==='OPTION'&&!child.hidden)options.push(child);
+  }
+  return options;
 }
 function customSelectName(select){
   const labelled=select.getAttribute('aria-label')||select.closest('label')?.querySelector('.screen-reader-only')?.textContent||select.title||select.id;
   return labelled.trim();
+}
+function customSelectLabel(option){
+  const key=option.dataset.i18n;
+  return key?translate(key):option.textContent.trim();
 }
 function refreshCustomSelect(select){
   const state=customSelectStates.get(select);
   if(!state)return;
   state.menu.replaceChildren();
   state.entries=[];
-  for(const child of select.children){
+  for(const child of Array.from(select.children)){
     if(child.tagName==='OPTGROUP'){
-      const options=[...child.options].filter(option=>!option.hidden);
+      const options=Array.from(child.children).filter(option=>option.tagName==='OPTION'&&!option.hidden);
       if(!options.length)continue;
-      const group=document.createElement('div');group.className='custom-select-group';group.setAttribute('role','presentation');group.textContent=child.label;state.menu.append(group);
+      const group=document.createElement('div');group.className='custom-select-group';group.setAttribute('role','presentation');group.textContent=child.dataset.i18nLabel?translate(child.dataset.i18nLabel):child.label;state.menu.append(group);
       for(const option of options)appendCustomOption(state,option);
     }else if(child.tagName==='OPTION'&&!child.hidden)appendCustomOption(state,child);
   }
-  const selected=select.selectedOptions[0]||state.entries[0]?.option;
-  state.value.textContent=selected?.textContent?.trim()||'';
+  const selected=customSelectOptions(select).find(option=>option.selected)||state.entries[0]?.option;
+  state.value.textContent=selected?customSelectLabel(selected):'';
   state.trigger.disabled=!!select.disabled;
   state.trigger.setAttribute('aria-disabled',String(!!select.disabled));
+  state.trigger.setAttribute('aria-label',customSelectName(select));
   state.wrapper.dataset.active=String(select.id==='word-activity'&&select.value!=='free'&&select.value!=='');
   state.entries.forEach(entry=>{
     entry.node.setAttribute('aria-selected',String(entry.option===selected));
@@ -170,18 +180,33 @@ function refreshCustomSelect(select){
   state.activeIndex=Math.max(0,state.entries.findIndex(entry=>entry.option===selected));
 }
 function appendCustomOption(state,option){
-  const node=document.createElement('div');node.className='custom-select-option';node.id=`${state.select.id}-option-${state.entries.length}`;node.setAttribute('role','option');node.dataset.value=option.value;node.textContent=option.textContent.trim();
+  const node=document.createElement('div');node.className='custom-select-option';node.id=`${state.select.id}-option-${state.entries.length}`;node.setAttribute('role','option');node.dataset.value=option.value;node.textContent=customSelectLabel(option);
   node.setAttribute('aria-disabled',String(!!option.disabled));
   node.addEventListener('pointerdown',event=>event.preventDefault());
   node.addEventListener('click',()=>{if(!option.disabled)commitCustomSelect(state.select,option.value);});
   state.menu.append(node);state.entries.push({option,node});
 }
 function refreshCustomSelects(){for(const select of customSelectStates.keys())refreshCustomSelect(select);}
+function positionCustomSelectMenu(state){
+  if(!state||state.menu.hidden)return;
+  const triggerRect=state.trigger.getBoundingClientRect();
+  const menuWidth=state.menu.offsetWidth;
+  const menuHeight=state.menu.offsetHeight;
+  const edge=8;
+  const openUp=window.innerHeight-triggerRect.bottom<menuHeight+edge&&triggerRect.top>menuHeight+edge;
+  state.menu.style.minWidth=`${Math.ceil(triggerRect.width)}px`;
+  const measuredWidth=state.menu.offsetWidth;
+  const left=Math.max(edge,Math.min(triggerRect.left,window.innerWidth-measuredWidth-edge));
+  const top=openUp?triggerRect.top-menuHeight-5:triggerRect.bottom+5;
+  state.menu.dataset.placement=openUp?'up':'down';
+  state.menu.style.left=`${Math.round(left)}px`;
+  state.menu.style.top=`${Math.round(top)}px`;
+}
 function closeCustomSelect(select=openCustomSelect,cancel=false){
   const state=select&&customSelectStates.get(select);if(!state)return;
   if(cancel&&state.openValue!==select.value){select.value=state.openValue;state.previewValue=null;refreshCustomSelect(select);}
   else if(!cancel&&state.previewValue!==null){state.previewValue=null;const changed=select.value!==state.openValue;refreshCustomSelect(select);if(changed)select.dispatchEvent(new Event('change',{bubbles:true}));else state.openValue=select.value;}
-  state.menu.hidden=true;state.trigger.setAttribute('aria-expanded','false');state.wrapper.classList.remove('is-open');state.typeahead='';clearTimeout(state.typeaheadTimer);
+  state.menu.hidden=true;state.menu.removeAttribute('data-placement');state.menu.style.removeProperty('left');state.menu.style.removeProperty('top');state.menu.style.removeProperty('position');state.menu.style.removeProperty('min-width');state.wrapper.append(state.menu);state.trigger.setAttribute('aria-expanded','false');state.wrapper.classList.remove('is-open');state.typeahead='';clearTimeout(state.typeaheadTimer);
   if(openCustomSelect===select)openCustomSelect=null;
 }
 function commitCustomSelect(select,value){
@@ -193,15 +218,14 @@ function commitCustomSelect(select,value){
 function openCustomSelectMenu(select){
   const state=customSelectStates.get(select);if(!state||select.disabled)return;
   if(openCustomSelect&&openCustomSelect!==select)closeCustomSelect(openCustomSelect);
-  openCustomSelect=select;state.openValue=select.value;state.menu.hidden=false;state.trigger.setAttribute('aria-expanded','true');state.wrapper.classList.add('is-open');
-  const rect=state.trigger.getBoundingClientRect(),spaceBelow=window.innerHeight-rect.bottom;
-  state.wrapper.dataset.placement=spaceBelow<190&&rect.top>spaceBelow?'up':'down';
+  openCustomSelect=select;state.openValue=select.value;document.body.append(state.menu);state.menu.hidden=false;state.menu.style.position='fixed';state.trigger.setAttribute('aria-expanded','true');state.wrapper.classList.add('is-open');positionCustomSelectMenu(state);
   state.activeIndex=Math.max(0,state.entries.findIndex(entry=>entry.option.value===select.value));
   updateCustomSelectActive(state);
 }
 function updateCustomSelectActive(state){
   state.entries.forEach((entry,index)=>entry.node.dataset.active=String(index===state.activeIndex));
-  state.entries[state.activeIndex]?.node.scrollIntoView({block:'nearest'});
+  const active=state.entries[state.activeIndex]?.node;
+  if(active){state.menu.setAttribute('aria-activedescendant',active.id);active.scrollIntoView({block:'nearest'});}
 }
 function moveCustomSelect(select,direction){
   const state=customSelectStates.get(select);if(!state?.entries.length)return;
@@ -238,7 +262,7 @@ function setupCustomSelects(){
     const wrapper=document.createElement('span');wrapper.className='custom-select';wrapper.dataset.selectId=select.id||'select';
     select.parentNode.insertBefore(wrapper,select);wrapper.append(select);
     const trigger=document.createElement('button');trigger.type='button';trigger.className='custom-select-trigger';trigger.id=`${select.id}-trigger`;trigger.setAttribute('aria-haspopup','listbox');trigger.setAttribute('aria-controls',`${select.id}-menu`);trigger.setAttribute('aria-label',customSelectName(select));
-    const value=document.createElement('span');value.className='custom-select-value';const chevron=document.createElement('span');chevron.className='custom-select-chevron';chevron.setAttribute('aria-hidden','true');chevron.textContent='⌄';trigger.append(value,chevron);
+    const value=document.createElement('span');value.className='custom-select-value';const chevron=document.createElement('span');chevron.className='custom-select-chevron';chevron.setAttribute('aria-hidden','true');trigger.append(value,chevron);
     const menu=document.createElement('div');menu.className='custom-select-menu';menu.id=`${select.id}-menu`;menu.setAttribute('role','listbox');menu.setAttribute('aria-labelledby',trigger.id||'');menu.hidden=true;
     wrapper.append(trigger,menu);select.classList.add('custom-select-native');select.setAttribute('aria-hidden','true');select.tabIndex=-1;
     const state={select,wrapper,trigger,value,menu,entries:[],activeIndex:0,openValue:select.value,previewValue:null,typeahead:'',typeaheadAt:0,typeaheadTimer:null};customSelectStates.set(select,state);
@@ -248,7 +272,9 @@ function setupCustomSelects(){
     refreshCustomSelect(select);
   });
 }
-document.addEventListener('pointerdown',event=>{if(openCustomSelect&&!event.target.closest('.custom-select'))closeCustomSelect(openCustomSelect);});
+document.addEventListener('pointerdown',event=>{if(openCustomSelect&&!event.target.closest('.custom-select')&&!event.target.closest('.custom-select-menu'))closeCustomSelect(openCustomSelect);});
+window.addEventListener('resize',()=>{const state=openCustomSelect&&customSelectStates.get(openCustomSelect);if(state)positionCustomSelectMenu(state);},{passive:true});
+window.addEventListener('scroll',()=>{const state=openCustomSelect&&customSelectStates.get(openCustomSelect);if(state)positionCustomSelectMenu(state);},{passive:true,capture:true});
 function uiLocale(){return {nl:'nl-NL',en:'en-GB',de:'de-DE'}[settings.uiLanguage]||'nl-NL';}
 function formatNumber(value,decimals=0){
   return Number(value).toLocaleString(uiLocale(),{minimumFractionDigits:decimals,maximumFractionDigits:decimals,useGrouping:false});
@@ -266,7 +292,7 @@ function applyInterface(){
   }
   $('ui-language').value=settings.uiLanguage;
   for(const id of ['language','custom-language']){
-    for(const option of $(id).options)option.textContent=option.value==='random'?translate('Willekeurige taal'):languageName(option.value);
+    for(const option of Array.from($(id).options))option.textContent=option.value==='random'?translate('Willekeurige taal'):languageName(option.value);
   }
   document.querySelectorAll('[data-language-source]').forEach(link=>{
     const code=link.dataset.languageSource;
@@ -377,6 +403,18 @@ function makeNumbers(count, options) {
 }
 function makePrompt(config,count,offset=0,state={capitalizeNext:offset===0}){
   return isCode(config)?makeCodePrompt(config,count):config.mode==='numbers'?makeNumbers(count,config):config.mode==='practice'?makePracticePrompt(config,count,offset,state):makeWords(config.language,count,config,config.practiceKeys||[],state);
+}
+function promptShapeKey(config){
+  return JSON.stringify({
+    mode:config?.mode,language:config?.language,numbers:config?.numbers,punctuation:config?.punctuation,
+    numberLength:config?.numberLength,practiceKeys:config?.practiceKeys||[],practiceLesson:config?.practiceLesson,
+    standardTest:config?.standardTest,standardLanguage:config?.standardLanguage,wordCorpus:config?.wordCorpus,
+    codeLanguage:config?.codeLanguage
+  });
+}
+function transformPromptCapitalization(words,config){
+  const options={...config,capitals:true},state={capitalizeNext:true};
+  return words.map(text=>applyWordCapitalization(String(text).toLocaleLowerCase(config.language),config.language,options,state));
 }
 function usesCapitalization(config){
   return config.capitals===true && (config.mode==='words' || (config.mode==='practice' && !guidedDrill(config)));
@@ -746,7 +784,39 @@ function scrollToCaret(){
     }
   }
 }
-function focusTyping(){if(!$('test-view').hidden && !document.querySelector('dialog[open]'))$('capture').focus({preventScroll:true});}
+let typingFocusFrame=0;
+function typingViewCanOwnFocus(){return !!session&&!$('test-view').hidden&&!document.querySelector('dialog[open]');}
+function isTypingControl(target){
+  if(!target||target===$('capture'))return true;
+  return !!target.closest?.('button,a,input,select,textarea,summary,[contenteditable="true"],dialog,.test-info-panel,.custom-select-menu');
+}
+function typingKeyOwnedByControl(event){
+  const target=event.target;
+  if(!target||target===$('capture'))return true;
+  if(target.closest?.('dialog,.test-info-panel,.custom-select-menu,input,textarea,select,[contenteditable="true"]'))return true;
+  if(target.closest?.('.custom-select-trigger')&&openCustomSelect)return true;
+  if(event.key==='Escape')return !!target.closest?.('button,a,summary,.custom-select-trigger');
+  if(['Enter',' ','Tab','ArrowDown','ArrowUp','ArrowLeft','ArrowRight','Home','End'].includes(event.key))return !!target.closest?.('button,a,summary,.custom-select-trigger');
+  return false;
+}
+function focusTyping(){if(typingViewCanOwnFocus())$('capture').focus({preventScroll:true});}
+function scheduleTypingFocus(){
+  cancelAnimationFrame(typingFocusFrame);
+  typingFocusFrame=requestAnimationFrame(()=>{
+    if(!typingViewCanOwnFocus()||document.activeElement===$('capture')||isTypingControl(document.activeElement)||document.hasFocus?.()===false)return;
+    focusTyping();
+  });
+}
+function restoreTypingKey(event){
+  if(!typingViewCanOwnFocus()||typingKeyOwnedByControl(event)||event.isComposing||event.key==='Dead'||event.key==='Process')return;
+  if(event.key==='Escape'||event.ctrlKey||event.metaKey||event.altKey){focusTyping();return;}
+  focusTyping();
+  if(event.key==='Tab'&&isCode(session?.config)){event.preventDefault();insertText(CODE_TAB);return;}
+  if(event.key==='Backspace'){event.preventDefault();eraseInput();return;}
+  if(event.key==='Enter'){event.preventDefault();insertText(isCode(session?.config)?'\n':' ');return;}
+  if(event.key==='Delete'){event.preventDefault();return;}
+  if(event.key.length===1){event.preventDefault();$('caps-warning').hidden=!event.getModifierState('CapsLock');handleCoachKeydown(event);insertText(event.key);}
+}
 function prepareTextRoll(shouldAnimate){
   const viewport=$('typing-viewport'),current=$('word-track');
   if(!shouldAnimate||!current?.children.length||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches){textRollCleanup?.();return;}
@@ -762,14 +832,16 @@ function prepareTextRoll(shouldAnimate){
   textRollCleanup=finish;
   window.setTimeout(finish,520);
 }
-function newTest(){
+function newTest({promptMode='fresh'}={}){
   const wasTypingView=!$('test-view').hidden;
+  const previousConfig=session?.config;
+  const previousWords=session?.words?.map(word=>word.text);
   closeTestInfo();
   clearInterval(timerHandle);timerHandle=null;document.body.classList.remove('running');
   setView('test');$('focus-overlay').hidden=true;$('caps-warning').hidden=true;
   $('fatal-error').hidden=true;currentResult=null;$('capture').value='';
   $('typing-viewport').scrollLeft=0;$('capture').style.top='0px';$('capture').style.left='0px';
-  prepareTextRoll(wasTypingView);
+  prepareTextRoll(wasTypingView&&promptMode==='fresh');
   $('word-track').replaceChildren();$('word-track').style.setProperty('--scroll-y','0px');nodes=[];
   $('test-time-fill').style.transform='scaleX(0)';
   try{
@@ -798,7 +870,12 @@ function newTest(){
       if(corpus.sha256)config.wordCorpusFingerprint=corpus.sha256;
     }
     const promptState={capitalizeNext:true};
-    const words=mode==='custom'?customText.split(' '):makePrompt(config,isAdaptive(config)?48:180,0,promptState);
+    const canReusePrompt=previousWords?.length&&previousConfig&&promptShapeKey(previousConfig)===promptShapeKey(config);
+    const words=canReusePrompt&&promptMode==='same'
+      ? previousWords
+      : canReusePrompt&&promptMode==='capitals'&&usesCapitalization(config)
+        ? transformPromptCapitalization(previousWords,config)
+        : mode==='custom'?customText.split(' '):makePrompt(config,isAdaptive(config)?48:180,0,promptState);
     session=new (isCode(config)?CodeTypingSession:TypingSession)(config,words,mode==='custom',promptState);appendNodes();renderWord(0);
     updateAccessiblePrompt();
     for(const id of ['live-dot','live-wpm','stop-btn'])$(id).hidden=true;
@@ -1897,6 +1974,10 @@ for(const [lang,corpus] of Object.entries(EXPANDED_LEXICONS)){
 $('license-text').textContent=RITME_DATA.license;
 $('benchmark-band-rows').innerHTML=SPEED_BANDS.map(b=>`<tr><td>${safeText(translate(b.label))}</td><td>${bandRange(b)}</td><td>${bandRange(b,5)}</td></tr>`).join('');
 $('language').addEventListener('change',()=>{if(standardActive())settings.standardLanguage=$('language').value;else settings.language=$('language').value;practiceKeys=[];if(mode==='practice'&&settings.practiceLesson==='weak'){settings.practiceLesson='words';settings.practiceKeys=[];}persistSettings();newTest();});
+$('mobile-settings-toggle').onclick=()=>{
+  const settingsPanel=$('mobile-settings'),toggle=$('mobile-settings-toggle'),open=settingsPanel.classList.toggle('is-collapsed')===false;
+  toggle.setAttribute('aria-expanded',String(open));
+};
 document.querySelectorAll('[data-duration]').forEach(b=>b.onclick=()=>{
   if(session?.running||standardActive())return;
   if(b.dataset.duration==='infinite'){
@@ -1906,7 +1987,7 @@ document.querySelectorAll('[data-duration]').forEach(b=>b.onclick=()=>{
     const duration=Number(b.dataset.duration);if(![15,30,60,120].includes(duration))return;
     settings.duration=duration;if(mode==='practice')settings.practiceInfinite=false;if(mode==='code')settings.codeInfinite=false;
   }
-  persistSettings();newTest();
+  persistSettings();newTest({promptMode:'same'});
 });
 $('code-btn').onclick=()=>{if(session?.running)return;mode='code';practiceKeys=[];newTest();};
 $('code-language').onchange=()=>{if(session?.running||!CODE_LANGUAGES.includes($('code-language').value))return;settings.codeLanguage=$('code-language').value;persistSettings();newTest();};
@@ -1917,7 +1998,7 @@ $('mix-numbers-btn').onclick=()=>{settings.numbers=!settings.numbers;persistSett
 $('number-length').onchange=()=>{settings.numberLength=$('number-length').value;persistSettings();newTest();};
 $('number-keyboard').onchange=()=>{if(session?.running)return;settings.numberKeyboard=$('number-keyboard').value==='numpad'?'numpad':'row';persistSettings();newTest();};
 $('punctuation-btn').onclick=()=>{settings.punctuation=!settings.punctuation;persistSettings();newTest();};
-$('capitals-btn').onclick=()=>{settings.capitals=!settings.capitals;persistSettings();newTest();};
+ $('capitals-btn').onclick=()=>{settings.capitals=!settings.capitals;persistSettings();newTest({promptMode:'capitals'});};
 $('words-btn').onclick=()=>{
   if(session?.running)return;
   if(settings.wordPractice)startPractice();
@@ -1969,7 +2050,10 @@ $('results-view').addEventListener('keydown',event=>{
 });
 $('typing-shell').addEventListener('click',focusTyping);$('focus-btn').onclick=focusTyping;
 $('capture').addEventListener('focus',()=>{$('focus-overlay').hidden=true;});
-$('capture').addEventListener('blur',()=>{if(session?.running && !$('test-view').hidden)$('focus-overlay').hidden=false;});
+$('capture').addEventListener('blur',event=>{
+  if(typingViewCanOwnFocus()&&!isTypingControl(event.relatedTarget)){$('focus-overlay').hidden=false;scheduleTypingFocus();}
+  else if(typingViewCanOwnFocus())$('focus-overlay').hidden=true;
+});
 $('capture').addEventListener('keydown',event=>{
   $('caps-warning').hidden=!event.getModifierState('CapsLock');handleCoachKeydown(event);
   if(event.isComposing || event.key==='Dead' || event.key==='Process')return;
@@ -2012,6 +2096,7 @@ document.addEventListener('keydown',event=>{
     requestNewTest();
   }
 });
+document.addEventListener('keydown',restoreTypingKey,true);
 document.addEventListener('pointerdown',event=>{if(!$('font-menu').contains(event.target) && !$('font-btn').contains(event.target)){$('font-menu').hidden=true;$('font-btn').setAttribute('aria-expanded','false');}});
 let chartResizeFrame=null;
 window.addEventListener('resize',()=>{
@@ -2025,7 +2110,7 @@ window.addEventListener('resize',()=>{
   });
 });
 window.addEventListener('blur',()=>{clearCoachKeys();if(session?.running)session.interrupted=true;});
-document.addEventListener('visibilitychange',()=>{if(document.hidden && session?.running)session.interrupted=true;else updateLive();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden && session?.running)session.interrupted=true;else{updateLive();if(typingViewCanOwnFocus())focusTyping();}});
 $('test-nav-btn').onclick=()=>{if(!$('test-view').hidden)focusTyping();else newTest();};
 for(const id of ['progress-new-btn','progress-empty-btn'])$(id).onclick=()=>newTest();
 for(const id of ['view-progress-btn','result-back'])$(id).onclick=openHistory;
