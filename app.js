@@ -181,7 +181,8 @@ function refreshCustomSelect(select){
   state.activeIndex=Math.max(0,state.entries.findIndex(entry=>entry.option===selected));
 }
 function appendCustomOption(state,option){
-  const node=document.createElement('div');node.className='custom-select-option';node.id=`${state.select.id}-option-${state.entries.length}`;node.setAttribute('role','option');node.dataset.value=option.value;node.textContent=customSelectLabel(option);
+  const node=document.createElement('div');node.className='custom-select-option';node.id=`${state.select.id}-option-${state.entries.length}`;node.setAttribute('role','option');node.dataset.value=option.value;
+  const label=document.createElement('span');label.className='custom-select-option-label';label.textContent=customSelectLabel(option);node.append(label);
   node.setAttribute('aria-disabled',String(!!option.disabled));
   node.addEventListener('pointerdown',event=>event.preventDefault());
   node.addEventListener('click',()=>{if(!option.disabled)commitCustomSelect(state.select,option.value);});
@@ -191,13 +192,14 @@ function refreshCustomSelects(){for(const select of customSelectStates.keys())re
 function positionCustomSelectMenu(state){
   if(!state||state.menu.hidden)return;
   const triggerRect=state.trigger.getBoundingClientRect();
-  const menuWidth=state.menu.offsetWidth;
-  const menuHeight=state.menu.offsetHeight;
   const edge=8;
+  const availableWidth=Math.max(0,window.innerWidth-edge*2);
+  state.menu.style.minWidth=`${Math.min(triggerRect.width,availableWidth)}px`;
+  state.menu.style.maxWidth=`${availableWidth}px`;
+  const menuWidth=Math.min(state.menu.offsetWidth,availableWidth);
+  const menuHeight=state.menu.offsetHeight;
   const openUp=window.innerHeight-triggerRect.bottom<menuHeight+edge&&triggerRect.top>menuHeight+edge;
-  state.menu.style.minWidth=`${Math.ceil(triggerRect.width)}px`;
-  const measuredWidth=state.menu.offsetWidth;
-  const left=Math.max(edge,Math.min(triggerRect.left,window.innerWidth-measuredWidth-edge));
+  const left=Math.max(edge,Math.min(triggerRect.left,window.innerWidth-menuWidth-edge));
   const top=openUp?triggerRect.top-menuHeight-5:triggerRect.bottom+5;
   state.menu.dataset.placement=openUp?'up':'down';
   state.menu.style.left=`${Math.round(left)}px`;
@@ -207,7 +209,7 @@ function closeCustomSelect(select=openCustomSelect,cancel=false){
   const state=select&&customSelectStates.get(select);if(!state)return;
   if(cancel&&state.openValue!==select.value){select.value=state.openValue;state.previewValue=null;refreshCustomSelect(select);}
   else if(!cancel&&state.previewValue!==null){state.previewValue=null;const changed=select.value!==state.openValue;refreshCustomSelect(select);if(changed)select.dispatchEvent(new Event('change',{bubbles:true}));else state.openValue=select.value;}
-  state.menu.hidden=true;state.menu.removeAttribute('data-placement');state.menu.style.removeProperty('left');state.menu.style.removeProperty('top');state.menu.style.removeProperty('position');state.menu.style.removeProperty('min-width');state.wrapper.append(state.menu);state.trigger.setAttribute('aria-expanded','false');state.wrapper.classList.remove('is-open');state.typeahead='';clearTimeout(state.typeaheadTimer);
+  state.menu.hidden=true;state.menu.removeAttribute('data-placement');state.menu.style.removeProperty('left');state.menu.style.removeProperty('top');state.menu.style.removeProperty('position');state.menu.style.removeProperty('min-width');state.menu.style.removeProperty('max-width');state.wrapper.append(state.menu);state.trigger.setAttribute('aria-expanded','false');state.wrapper.classList.remove('is-open');state.typeahead='';clearTimeout(state.typeaheadTimer);
   if(openCustomSelect===select)openCustomSelect=null;
 }
 function commitCustomSelect(select,value){

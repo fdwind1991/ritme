@@ -92,8 +92,8 @@
   outline: none;
 }
 
-/* Shared custom scrollbars. Every scroll surface uses the same paper-toned
-   track and rounded thumb; no scroll handlers or hidden scrollbars. */
+/* Shared custom scrollbars. Every scroll surface uses the modal baseline:
+   paper-toned track, 10px rail and a rounded thumb. */
 :where(html, body, dialog, dialog *, .history-scroll, .license-text, .test-info-panel, .custom-select-menu, textarea) {
   scrollbar-width:thin;
   scrollbar-color:var(--muted) var(--bg);
@@ -103,8 +103,12 @@
   overscroll-behavior:contain;
 }
 @supports selector(::-webkit-scrollbar) {
+  :where(html, body, dialog, dialog *, .history-scroll, .license-text, .test-info-panel, .custom-select-menu, textarea) {
+    scrollbar-width:auto;
+    scrollbar-color:auto;
+  }
   :where(html, body, dialog, dialog *, .history-scroll, .license-text, .test-info-panel, .custom-select-menu, textarea)::-webkit-scrollbar {
-    width:8px; height:8px;
+    width:10px; height:10px;
   }
   :where(html, body, dialog, dialog *, .history-scroll, .license-text, .test-info-panel, .custom-select-menu, textarea)::-webkit-scrollbar-track,
   :where(html, body, dialog, dialog *, .history-scroll, .license-text, .test-info-panel, .custom-select-menu, textarea)::-webkit-scrollbar-corner {
@@ -112,7 +116,7 @@
   }
   :where(html, body, dialog, dialog *, .history-scroll, .license-text, .test-info-panel, .custom-select-menu, textarea)::-webkit-scrollbar-thumb {
     background:var(--muted);
-    border:2px solid var(--bg);
+    border:3px solid var(--bg);
     border-radius:999px;
     min-height:32px;
     min-width:32px;
@@ -125,8 +129,11 @@
 @media (pointer:coarse) {
   @supports selector(::-webkit-scrollbar) {
     :where(html, body, dialog, dialog *, .history-scroll, .license-text, .test-info-panel, .custom-select-menu, textarea)::-webkit-scrollbar {
-      width:10px; height:10px;
+      width:14px; height:14px;
     }
+  }
+  :where(html, body, dialog, dialog *, .history-scroll, .license-text, .test-info-panel, .custom-select-menu, textarea) {
+    scrollbar-width:auto;
   }
 }
 @media (forced-colors:active) {
