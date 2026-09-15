@@ -46,9 +46,8 @@
   100% { opacity:0; transform:scaleX(1); }
 }
 .progress-marker { transform-box:fill-box; transform-origin:center; transition:transform .1s ease; }
-.progress-dot:hover .progress-marker,.progress-dot:focus .progress-marker { transform:scale(1.25); }
+.progress-dot:hover .progress-marker { transform:scale(1.25); }
 .result-point { fill:var(--net); stroke:var(--bg); stroke-width:1.5px; pointer-events:none; }
-#chart:focus-visible { outline:1px solid var(--accent); outline-offset:5px; }
 
 /* Two static icons crossfade; the target theme remains accessible via the
    existing button label. No extra requests or icon font. */

@@ -2720,6 +2720,31 @@ const RITME_DATA = {
       "en": "Highest indicative band",
       "de": "Höchster unverbindlicher Bereich"
     },
+    "benchmark.indicative": {
+      "nl": "Indicatieve schaal",
+      "en": "Indicative scale",
+      "de": "Unverbindliche Skala"
+    },
+    "benchmark.indicative.note": {
+      "nl": "Indicatieve bands voor deze modus; geen rechtstreeks vergelijkbare bevolkingsnorm.",
+      "en": "Indicative bands for this mode; not a directly comparable population norm.",
+      "de": "Unverbindliche Bereiche für diesen Modus; keine direkt vergleichbare Bevölkerungsnorm."
+    },
+    "benchmark.sameSettings": {
+      "nl": "Vergelijk vooral met je eigen tests met dezelfde instellingen.",
+      "en": "Compare primarily with your own tests using the same settings.",
+      "de": "Vergleiche vor allem eigene Tests mit denselben Einstellungen."
+    },
+    "benchmark.comparable.mode.one": {
+      "nl": "{count} vergelijkbare test in {mode}. ",
+      "en": "{count} comparable test in {mode}. ",
+      "de": "{count} vergleichbarer Test in {mode}. "
+    },
+    "benchmark.comparable.mode.other": {
+      "nl": "{count} vergelijkbare tests in {mode}. ",
+      "en": "{count} comparable tests in {mode}. ",
+      "de": "{count} vergleichbare Tests in {mode}. "
+    },
     "benchmark.help": {
       "nl": "Bandbreedtes & bron",
       "en": "Bands & source",
@@ -2946,14 +2971,14 @@ const RITME_DATA = {
       "de": "Die Studie zählt die Länge des abgeschriebenen Textes; Ritme zählt nur korrekte Endzeichen. Auch Aufgabe und Zeitmessung unterscheiden sich. Der Vergleich ist deshalb grob und behauptet keinen persönlichen Perzentilrang. Sprache, Text, Satzzeichen, Gerät und Testdauer bleiben relevant. Tests unter 60 Sekunden zeigen einen Hinweis auf die Momentaufnahme."
     },
     "help.paragraph.16": {
-      "nl": "Geen woordbenchmark voor cijferreeksen. Vanaf drie eerdere volledige, niet-onderbroken tests met dezelfde instellingen toont Ritme het <strong>minimum–maximum van je eigen voorgaande tests</strong>, met hun gemiddelde als referentielijn. De huidige test telt niet mee in zijn eigen referentie. Alleen eerder gedateerde, nog lokaal bewaarde tests tellen mee. Dit bereik is geen betrouwbaarheidsinterval en geen vergelijking met andere mensen. Tot die tijd staat er hoeveel referentietests ontbreken.",
-      "en": "There is no word benchmark for number sequences. After three earlier complete, uninterrupted tests with the same settings, Ritme shows the <strong>minimum–maximum of your own previous tests</strong>, with their average as a reference line. The current test does not contribute to its own reference. Only earlier-dated tests still stored locally count. This range is not a confidence interval or a comparison with other people. Until then, you can see how many reference tests are still needed.",
-      "de": "Für Zahlenfolgen gibt es keinen Wortbenchmark. Ab drei früheren vollständigen, nicht unterbrochenen Tests mit denselben Einstellungen zeigt Ritme das <strong>Minimum–Maximum deiner eigenen vorherigen Tests</strong>, mit deren Durchschnitt als Referenzlinie. Der aktuelle Test zählt nicht zu seiner eigenen Referenz. Es zählen nur früher datierte, noch lokal gespeicherte Tests. Dieser Bereich ist kein Konfidenzintervall und kein Vergleich mit anderen Menschen. Bis dahin siehst du, wie viele Referenztests noch fehlen."
+      "nl": "Alle volledige modi krijgen indicatieve bands op dezelfde WPM/CPM-schaal. De onderzoeksreferentie is alleen een globale oriëntatie voor vergelijkbare woordtests; code, getallen, eigen tekst en gerichte oefeningen zijn niet rechtstreeks vergelijkbaar. Vergelijk die modi vooral met je eigen eerdere tests met dezelfde instellingen.",
+      "en": "All complete modes receive indicative bands on the same WPM/CPM scale. The study reference is only a broad orientation for comparable word tests; code, numbers, custom text and targeted practice are not directly comparable. For those modes, compare primarily with your own earlier tests using the same settings.",
+      "de": "Alle vollständigen Modi erhalten unverbindliche Bereiche auf derselben WPM/CPM-Skala. Die Studienreferenz ist nur eine grobe Orientierung für vergleichbare Worttests; Code, Zahlen, eigene Texte und gezielte Übungen sind nicht direkt vergleichbar. Vergleiche diese Modi vor allem mit eigenen früheren Tests mit denselben Einstellungen."
     },
     "help.paragraph.17": {
-      "nl": "Eigen teksten, afgebroken tests en onderbroken tests krijgen geen extern tempolabel. In Voortgang wordt de externe schaal alleen getoond voor een selectie van vergelijkbare woordtests, bij de meting Snelheid. De lijn in de voortgangsgrafiek is hetzelfde onderzoeksreferentiepunt; hij blijft weg bij getallen, gemengde instellingen en nauwkeurigheids- of ritmemetingen.",
-      "en": "Custom texts, shortened tests and interrupted tests do not receive an external pace label. In Progress, the external scale appears only for a selection of comparable word tests with the Speed metric. The line in the progress chart uses the same study reference; it is not shown for numbers, mixed settings, accuracy or consistency.",
-      "de": "Eigene Texte, verkürzte und unterbrochene Tests erhalten keine externe Tempobewertung. Unter Fortschritt erscheint die externe Skala nur bei einer Auswahl vergleichbarer Worttests mit der Kennzahl Tempo. Die Linie im Fortschrittsdiagramm verwendet denselben Studienreferenzwert; bei Zahlen, gemischten Einstellungen, Genauigkeit oder Gleichmaß wird sie nicht angezeigt."
+      "nl": "Eigen teksten, afgebroken tests en onderbroken tests krijgen geen onderzoeksreferentie. Volledige tests krijgen wel bands in het resultaat en in Voortgang bij de meting Snelheid. De onderzoekslijn blijft alleen zichtbaar bij een selectie vergelijkbare woordtests; bij andere modi zijn de bands een indicatieve in-app indeling.",
+      "en": "Custom texts, shortened tests and interrupted tests do not receive a study reference. Complete tests still receive bands in the result and in Progress with the Speed metric. The study line appears only for a selection of comparable word tests; for other modes, the bands are an indicative in-app classification.",
+      "de": "Eigene Texte, verkürzte und unterbrochene Tests erhalten keine Studienreferenz. Vollständige Tests erhalten im Ergebnis und in Fortschritt beim Tempo-Messwert dennoch Bereiche. Die Studienlinie erscheint nur bei einer Auswahl vergleichbarer Worttests; bei anderen Modi sind die Bereiche eine unverbindliche In-App-Einteilung."
     },
     "help.paragraph.18": {
       "nl": "Accuracy = correcte eindtekens ÷ (overgebleven getypte tekens + overgeslagen tekens) × 100%<br/>Aanslagnauwkeurigheid = juiste invoerpogingen ÷ alle invoerpogingen × 100%",

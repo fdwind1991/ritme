@@ -136,6 +136,119 @@ function translate(key,values={}){
   return text.replace(/\{([a-zA-Z0-9_]+)\}/g,(match,name)=>Object.hasOwn(values,name)?String(values[name]):match);
 }
 function tp(key,count,values={}){return translate(key+(count===1?'.one':'.other'),{...values,count});}
+const customSelectStates=new Map();
+let openCustomSelect=null;
+function customSelectOptions(select){
+  return [...select.options].filter(option=>!option.hidden);
+}
+function customSelectName(select){
+  const labelled=select.getAttribute('aria-label')||select.closest('label')?.querySelector('.screen-reader-only')?.textContent||select.title||select.id;
+  return labelled.trim();
+}
+function refreshCustomSelect(select){
+  const state=customSelectStates.get(select);
+  if(!state)return;
+  state.menu.replaceChildren();
+  state.entries=[];
+  for(const child of select.children){
+    if(child.tagName==='OPTGROUP'){
+      const options=[...child.options].filter(option=>!option.hidden);
+      if(!options.length)continue;
+      const group=document.createElement('div');group.className='custom-select-group';group.setAttribute('role','presentation');group.textContent=child.label;state.menu.append(group);
+      for(const option of options)appendCustomOption(state,option);
+    }else if(child.tagName==='OPTION'&&!child.hidden)appendCustomOption(state,child);
+  }
+  const selected=select.selectedOptions[0]||state.entries[0]?.option;
+  state.value.textContent=selected?.textContent?.trim()||'';
+  state.trigger.disabled=!!select.disabled;
+  state.trigger.setAttribute('aria-disabled',String(!!select.disabled));
+  state.wrapper.dataset.active=String(select.id==='word-activity'&&select.value!=='free'&&select.value!=='');
+  state.entries.forEach(entry=>{
+    entry.node.setAttribute('aria-selected',String(entry.option===selected));
+    entry.node.dataset.active=String(entry.option===selected);
+  });
+  state.activeIndex=Math.max(0,state.entries.findIndex(entry=>entry.option===selected));
+}
+function appendCustomOption(state,option){
+  const node=document.createElement('div');node.className='custom-select-option';node.id=`${state.select.id}-option-${state.entries.length}`;node.setAttribute('role','option');node.dataset.value=option.value;node.textContent=option.textContent.trim();
+  node.setAttribute('aria-disabled',String(!!option.disabled));
+  node.addEventListener('pointerdown',event=>event.preventDefault());
+  node.addEventListener('click',()=>{if(!option.disabled)commitCustomSelect(state.select,option.value);});
+  state.menu.append(node);state.entries.push({option,node});
+}
+function refreshCustomSelects(){for(const select of customSelectStates.keys())refreshCustomSelect(select);}
+function closeCustomSelect(select=openCustomSelect,cancel=false){
+  const state=select&&customSelectStates.get(select);if(!state)return;
+  if(cancel&&state.openValue!==select.value){select.value=state.openValue;state.previewValue=null;refreshCustomSelect(select);}
+  else if(!cancel&&state.previewValue!==null){state.previewValue=null;const changed=select.value!==state.openValue;refreshCustomSelect(select);if(changed)select.dispatchEvent(new Event('change',{bubbles:true}));else state.openValue=select.value;}
+  state.menu.hidden=true;state.trigger.setAttribute('aria-expanded','false');state.wrapper.classList.remove('is-open');state.typeahead='';clearTimeout(state.typeaheadTimer);
+  if(openCustomSelect===select)openCustomSelect=null;
+}
+function commitCustomSelect(select,value){
+  const state=customSelectStates.get(select);if(!state)return;
+  const option=customSelectOptions(select).find(candidate=>candidate.value===value);if(!option||option.disabled)return;
+  const changed=select.value!==value;select.value=value;state.previewValue=null;refreshCustomSelect(select);closeCustomSelect(select);
+  if(changed)select.dispatchEvent(new Event('change',{bubbles:true}));
+}
+function openCustomSelectMenu(select){
+  const state=customSelectStates.get(select);if(!state||select.disabled)return;
+  if(openCustomSelect&&openCustomSelect!==select)closeCustomSelect(openCustomSelect);
+  openCustomSelect=select;state.openValue=select.value;state.menu.hidden=false;state.trigger.setAttribute('aria-expanded','true');state.wrapper.classList.add('is-open');
+  const rect=state.trigger.getBoundingClientRect(),spaceBelow=window.innerHeight-rect.bottom;
+  state.wrapper.dataset.placement=spaceBelow<190&&rect.top>spaceBelow?'up':'down';
+  state.activeIndex=Math.max(0,state.entries.findIndex(entry=>entry.option.value===select.value));
+  updateCustomSelectActive(state);
+}
+function updateCustomSelectActive(state){
+  state.entries.forEach((entry,index)=>entry.node.dataset.active=String(index===state.activeIndex));
+  state.entries[state.activeIndex]?.node.scrollIntoView({block:'nearest'});
+}
+function moveCustomSelect(select,direction){
+  const state=customSelectStates.get(select);if(!state?.entries.length)return;
+  let index=state.activeIndex;
+  do{index=(index+direction+state.entries.length)%state.entries.length;}while(state.entries[index].option.disabled&&index!==state.activeIndex);
+  state.activeIndex=index;state.previewValue=state.entries[index].option.value;select.value=state.previewValue;refreshCustomSelect(select);updateCustomSelectActive(state);
+}
+function typeaheadCustomSelect(select,key){
+  const state=customSelectStates.get(select);if(!state||select.disabled)return;
+  state.typeahead=(Date.now()-state.typeaheadAt<650?state.typeahead:'')+key.toLocaleLowerCase();state.typeaheadAt=Date.now();
+  let entry=state.entries.find(candidate=>!candidate.option.disabled&&candidate.option.textContent.trim().toLocaleLowerCase().startsWith(state.typeahead));
+  if(!entry){state.typeahead=key.toLocaleLowerCase();entry=state.entries.find(candidate=>!candidate.option.disabled&&candidate.option.textContent.trim().toLocaleLowerCase().startsWith(state.typeahead));}
+  if(!entry)return;
+  state.previewValue=entry.option.value;select.value=entry.option.value;refreshCustomSelect(select);state.activeIndex=state.entries.indexOf(entry);updateCustomSelectActive(state);clearTimeout(state.typeaheadTimer);state.typeaheadTimer=setTimeout(()=>{if(state.previewValue!==null)commitCustomSelect(select,state.previewValue);},650);
+}
+function handleCustomSelectKeydown(event,select){
+  const state=customSelectStates.get(select);if(!state||select.disabled)return;
+  if(event.key.length===1&&!event.ctrlKey&&!event.metaKey&&!event.altKey){event.preventDefault();typeaheadCustomSelect(select,event.key);return;}
+  if(event.key==='Escape'){event.preventDefault();closeCustomSelect(select,true);return;}
+  if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+    event.preventDefault();if(state.menu.hidden)openCustomSelectMenu(select);else moveCustomSelect(select,event.key==='ArrowDown'?1:-1);return;
+  }
+  if(event.key==='Home'||event.key==='End'){
+    event.preventDefault();if(state.menu.hidden)openCustomSelectMenu(select);state.activeIndex=event.key==='Home'?0:state.entries.length-1;state.previewValue=state.entries[state.activeIndex]?.option.value;select.value=state.previewValue||select.value;refreshCustomSelect(select);updateCustomSelectActive(state);return;
+  }
+  if(event.key==='Enter'||event.key===' '){
+    event.preventDefault();if(state.previewValue!==null)commitCustomSelect(select,state.previewValue);else if(state.menu.hidden)openCustomSelectMenu(select);else commitCustomSelect(select,state.entries[state.activeIndex]?.option.value);return;
+  }
+  if(event.key==='Tab'&&state.previewValue!==null)commitCustomSelect(select,state.previewValue);
+}
+function setupCustomSelects(){
+  document.querySelectorAll('select').forEach(select=>{
+    if(customSelectStates.has(select))return;
+    const wrapper=document.createElement('span');wrapper.className='custom-select';wrapper.dataset.selectId=select.id||'select';
+    select.parentNode.insertBefore(wrapper,select);wrapper.append(select);
+    const trigger=document.createElement('button');trigger.type='button';trigger.className='custom-select-trigger';trigger.id=`${select.id}-trigger`;trigger.setAttribute('aria-haspopup','listbox');trigger.setAttribute('aria-controls',`${select.id}-menu`);trigger.setAttribute('aria-label',customSelectName(select));
+    const value=document.createElement('span');value.className='custom-select-value';const chevron=document.createElement('span');chevron.className='custom-select-chevron';chevron.setAttribute('aria-hidden','true');chevron.textContent='⌄';trigger.append(value,chevron);
+    const menu=document.createElement('div');menu.className='custom-select-menu';menu.id=`${select.id}-menu`;menu.setAttribute('role','listbox');menu.setAttribute('aria-labelledby',trigger.id||'');menu.hidden=true;
+    wrapper.append(trigger,menu);select.classList.add('custom-select-native');select.setAttribute('aria-hidden','true');select.tabIndex=-1;
+    const state={select,wrapper,trigger,value,menu,entries:[],activeIndex:0,openValue:select.value,previewValue:null,typeahead:'',typeaheadAt:0,typeaheadTimer:null};customSelectStates.set(select,state);
+    trigger.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();state.menu.hidden?openCustomSelectMenu(select):closeCustomSelect(select);});
+    trigger.addEventListener('keydown',event=>handleCustomSelectKeydown(event,select));
+    select.addEventListener('change',()=>{state.previewValue=null;state.openValue=select.value;refreshCustomSelect(select);closeCustomSelect(select);});
+    refreshCustomSelect(select);
+  });
+}
+document.addEventListener('pointerdown',event=>{if(openCustomSelect&&!event.target.closest('.custom-select'))closeCustomSelect(openCustomSelect);});
 function uiLocale(){return {nl:'nl-NL',en:'en-GB',de:'de-DE'}[settings.uiLanguage]||'nl-NL';}
 function formatNumber(value,decimals=0){
   return Number(value).toLocaleString(uiLocale(),{minimumFractionDigits:decimals,maximumFractionDigits:decimals,useGrouping:false});
@@ -162,6 +275,7 @@ function applyInterface(){
   const highlighted=!$('results-view').hidden&&currentResult?speedBand(currentResult.wpm):null;
   $('benchmark-band-rows').innerHTML=SPEED_BANDS.map(b=>`<tr${b===highlighted?' class="is-current" aria-current="true"':''}><td>${safeText(translate(b.label))}</td><td>${bandRange(b)}</td><td>${bandRange(b,5)}</td></tr>`).join('');
   $('custom-count').textContent=translate('characters',{count:$('custom-text').value.length});
+  refreshCustomSelects();
   applyAppearance();
 }
 function setInterfaceLanguage(language){
@@ -500,6 +614,7 @@ class CodeTypingSession extends TypingSession {
 let session=null, currentResult=null, customText='', practiceKeys=[...(settings.practiceKeys||[])], mode=settings.mode;
 let progressMetric='wpm',progressFilterInitialized=false;
 let nodes=[], timerHandle=null, lastUiTime=0, composing=false, confirmAction=null;
+let textRollCleanup=null;
 let toastTimer=null, reenterFocus=true;
 const shownSeries={burst:true,raw:true,net:true,fixed:true,wrong:true};
 function toast(message){$('toast').textContent=message;$('toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),3200);}
@@ -561,6 +676,7 @@ function updateControls(){
   $('stage-label').textContent=isNumbers?translate(isNumpad(session.config)?'numpad.stage':'Alleen cijfers · spatie tussen getallen'):isCustom?translate("Eigen tekst · ")+resultLanguage(session.config):resultLanguage(session.config)+' · '+(mode==='practice'?translate("gerichte oefening"):translate("losse woorden"));
   $('hint-main').textContent=isNumbers?translate("Typ de getallen over"):isCustom?translate("Typ je eigen tekst over"):translate("Begin met typen");
   if(isPractice)$('hint-main').textContent=translate(infinite?'practice.infinite.hint':'practice.hint');
+  refreshCustomSelects();
   renderCoach();renderTestInfo();
   if(!running){
     $('timer').hidden=false;$('timer').textContent=infinite?'∞ 0:00':clock(standard?60:settings.duration);$('timer').classList.remove('warning');
@@ -631,12 +747,29 @@ function scrollToCaret(){
   }
 }
 function focusTyping(){if(!$('test-view').hidden && !document.querySelector('dialog[open]'))$('capture').focus({preventScroll:true});}
+function prepareTextRoll(shouldAnimate){
+  const viewport=$('typing-viewport'),current=$('word-track');
+  if(!shouldAnimate||!current?.children.length||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches){textRollCleanup?.();return;}
+  textRollCleanup?.();
+  current.id='word-track-outgoing';current.classList.add('text-roll-out');
+  const incoming=document.createElement('div');incoming.id='word-track';incoming.className='word-track text-roll-in';viewport.append(incoming);
+  let finished=false;
+  const finish=()=>{
+    if(finished)return;
+    finished=true;current.remove();incoming.classList.remove('text-roll-in');textRollCleanup=null;
+  };
+  current.addEventListener('animationend',finish,{once:true});
+  textRollCleanup=finish;
+  window.setTimeout(finish,520);
+}
 function newTest(){
+  const wasTypingView=!$('test-view').hidden;
   closeTestInfo();
   clearInterval(timerHandle);timerHandle=null;document.body.classList.remove('running');
   setView('test');$('focus-overlay').hidden=true;$('caps-warning').hidden=true;
   $('fatal-error').hidden=true;currentResult=null;$('capture').value='';
   $('typing-viewport').scrollLeft=0;$('capture').style.top='0px';$('capture').style.left='0px';
+  prepareTextRoll(wasTypingView);
   $('word-track').replaceChildren();$('word-track').style.setProperty('--scroll-y','0px');nodes=[];
   $('test-time-fill').style.transform='scaleX(0)';
   try{
@@ -838,7 +971,6 @@ const SPEED_BANDS = Object.freeze([
   {min:100, max:120,      label:'Zeer snel'},
   {min:120, max:Infinity, label:'Uitzonderlijk snel'}
 ].map(Object.freeze));
-const BENCHMARK_MIN_HISTORY = 3;
 const benchmarkViews = new Map();
 const benchmarkNumber = n => Number(n).toLocaleString(uiLocale(),{maximumFractionDigits:2});
 const benchmarkSpeed = n => `${benchmarkNumber(n)} WPM · ${benchmarkNumber(n*5)} CPM`;
@@ -863,34 +995,33 @@ function showBenchmarkHelp(wpm=null){
 function externalBenchmarkAllowed(r){
   return (r.mode||'words')==='words' && isCompleteResult(r) && Number.isFinite(r.wpm) && r.wpm>=0 && r.duration>=15;
 }
+function benchmarkBandsAllowed(r){
+  return isCompleteResult(r) && Number.isFinite(r.wpm) && r.wpm>=0 && r.duration>=15;
+}
 function comparableExternalBenchmark(rows,comparable){
   return comparable && rows.length>0 && rows.every(externalBenchmarkAllowed);
+}
+function comparableBandBenchmark(rows,comparable){
+  return comparable && rows.length>0 && rows.every(benchmarkBandsAllowed);
 }
 function benchmarkModel(r){
   const base={wpm:r.wpm,kind:'unavailable',heading:translate("Tempo in perspectief"),title:translate("Geen benchmark"),note:''};
   if(!Number.isFinite(r.wpm)||r.wpm<0)return {...base,wpm:null,note:translate("Geen bruikbare snelheid beschikbaar.")};
   if(!isCompleteResult(r))return {...base,title:r.interrupted?translate("Test onderbroken"):translate("Verkorte test"),note:translate("Geen tempobeoordeling: rond een volledige test af zonder onderbreking.")};
   if(r.duration<15)return {...base,title:translate("Te korte meting"),note:translate("Minder dan 15 seconden: onvoldoende voor deze tempo-indicatie.")};
-  if(isCode(r))return {...base,title:translate('code.label'),note:translate('code.benchmark')};
-  if(r.mode==='custom')return {...base,title:translate("Eigen tekst"),note:translate("Teksten verschillen in moeilijkheid. Je snelheid blijft zichtbaar, maar krijgt geen algemeen tempolabel.")};
-  if(isAdaptive(r))return {...base,title:translate('adaptive.noBenchmark'),note:translate('adaptive.noBenchmark.note')};
-  if(r.mode==='numbers'||r.mode==='practice'){
-    const previous=history.filter(x=>x.id!==r.id && isCompleteResult(x) && x.duration>=15 && profileKey(x)===profileKey(r) && new Date(x.date)<new Date(r.date) && Number.isFinite(x.wpm) && x.wpm>=0);
-    const noun=r.mode==='numbers'?translate("cijferreeksen"):translate("gerichte oefeningen");
-    if(previous.length<BENCHMARK_MIN_HISTORY)return {...base,heading:translate("Persoonlijke benchmark"),title:translate("Bouw je referentie op"),note:translate('benchmark.build',{count:previous.length,needed:BENCHMARK_MIN_HISTORY,noun})};
-    const values=previous.map(x=>x.wpm),min=Math.min(...values),max=Math.max(...values),average=mean(values);
-    return {...base,kind:'personal',heading:translate("Je eigen referentie"),title:r.wpm>max?translate("Boven je eerdere bereik"):r.wpm<min?translate("Onder je eerdere bereik"):translate("Binnen je eerdere bereik"),
-      min,max,reference:average,next:null,count:values.length,
-      note:translate('benchmark.range',{min:benchmarkNumber(min),max:benchmarkNumber(max),minCpm:benchmarkNumber(min*5),maxCpm:benchmarkNumber(max*5),count:values.length})};
-  }
   const band=speedBand(r.wpm);
-  let note=translate("Indicatieve eigen indeling; onderzoek met Engelse zinnen, niet deze test.");
-  if(r.language!=='en')note+=translate(" Geen taalspecifieke norm.");
-  if(r.numbers)note+=translate(" Woorden met cijfers zijn niet apart genormeerd.");
+  const research=externalBenchmarkAllowed(r);
+  let note=research?translate("Indicatieve eigen indeling; onderzoek met Engelse zinnen, niet deze test."):translate('benchmark.indicative.note');
+  if(research&&r.language!=='en')note+=translate(" Geen taalspecifieke norm.");
+  if(research&&r.numbers)note+=translate(" Woorden met cijfers zijn niet apart genormeerd.");
+  if(isCode(r))note+=' '+translate('code.benchmark');
+  else if(r.mode==='custom')note+=' '+translate("Teksten verschillen in moeilijkheid. Vergelijk eigen teksten alleen met dezelfde tekst.");
+  else if(isAdaptive(r))note+=' '+translate('adaptive.noBenchmark.note');
+  else if(r.mode==='numbers'||r.mode==='practice')note+=' '+translate('benchmark.sameSettings');
   if(usesCapitalization(r))note+=' '+translate('capitals.benchmark');
   if(r.duration<60)note+=translate(" Korte test: momentopname.");
   if(r.wpm>SPEED_REFERENCE.plotMax)note+=translate(" De schaal eindigt bij 140+ WPM / 700+ CPM.");
-  return {...base,kind:'external',title:translate(band.label),band,reference:SPEED_REFERENCE.wpm,next:Number.isFinite(band.max)?band.max:null,note};
+  return {...base,kind:'bands',title:translate(band.label),band,research,reference:research?SPEED_REFERENCE.wpm:null,next:Number.isFinite(band.max)?band.max:null,note};
 }
 function renderBenchmark(id,model,animate=true){
   const host=$(id);if(!host)return;
@@ -898,21 +1029,21 @@ function renderBenchmark(id,model,animate=true){
   host.hidden=!model;
   if(!model){host.replaceChildren();return;}
   host.dataset.state=model.kind;
-  const refLabel=model.kind==='personal'?translate("Eigen gemiddelde"):translate("Onderzoek · ≈");
-  const meta=model.kind==='unavailable'?'':`<div class="benchmark-meta"><span class="benchmark-reference">${refLabel} ${safeText(benchmarkSpeed(model.reference))}</span>${model.next!==null?`<span class="benchmark-next">${safeText(translate('benchmark.next',{speed:benchmarkSpeed(model.next)}))}</span>`:model.kind==='external'?`<span>${translate('benchmark.top')}</span>`:''}</div>`;
+  const refLabel=model.research?translate("Onderzoek · ≈"):translate('benchmark.indicative');
+  const meta=model.kind==='unavailable'?'':`<div class="benchmark-meta"><span class="benchmark-reference">${refLabel}${Number.isFinite(model.reference)?' '+safeText(benchmarkSpeed(model.reference)):''}</span>${model.next!==null?`<span class="benchmark-next">${safeText(translate('benchmark.next',{speed:benchmarkSpeed(model.next)}))}</span>`:`<span>${translate('benchmark.top')}</span>`}</div>`;
   host.innerHTML=`<div class="benchmark-head"><h2>${safeText(model.heading)}</h2><button type="button" class="benchmark-help" aria-label="${safeText(translate('benchmark.helpAria'))}">${safeText(translate('benchmark.help'))} <span aria-hidden="true">↗</span></button></div><div class="benchmark-summary"><strong class="benchmark-level">${safeText(model.title)}</strong><span class="benchmark-score">${model.scoreLabel?safeText(model.scoreLabel)+' · ':''}${Number.isFinite(model.wpm)?safeText(benchmarkSpeed(model.wpm)):''}</span></div>${model.kind==='unavailable'?'':`<svg role="img" aria-label="${safeText(translate('benchmark.scaleAria'))}"></svg>`}${meta}<p class="benchmark-note">${safeText(model.note)}</p>`;
-  host.querySelector('.benchmark-help').onclick=()=>showBenchmarkHelp(model.kind==='external'?model.wpm:null);
+  host.querySelector('.benchmark-help').onclick=()=>showBenchmarkHelp(model.kind==='bands'?model.wpm:null);
   if(model.kind!=='unavailable')drawBenchmarkRuler(host,model,animate);
 }
 function drawBenchmarkRuler(host,model,animate=true){
   const svg=host.querySelector('svg');if(!svg)return;
   const W=Math.max(245,Math.round(host.clientWidth||680)),H=66,L=W<400?31:38,R=18,pw=W-L-R;
-  const max=model.kind==='external'?SPEED_REFERENCE.plotMax:Math.max(20,Math.ceil(Math.max(model.wpm,model.max)*1.15/10)*10);
+  const max=model.kind==='bands'?SPEED_REFERENCE.plotMax:Math.max(20,Math.ceil(Math.max(model.wpm,model.max)*1.15/10)*10);
   const x=v=>L+Math.max(0,Math.min(max,v))/max*pw;
   const n=v=>Number(v).toFixed(2);
-  const ticks=model.kind==='external'?[0,30,60,80,100,120,140]:Array.from({length:5},(_,i)=>max*i/4);
-  let out=`<title>${safeText(model.title)} · ${safeText(benchmarkSpeed(model.wpm))}</title><desc>${model.kind==='external'?translate("Zes indicatieve tempobanden. Een stippellijn markeert het onderzoeksreferentiepunt."):translate("Een lijn markeert het minimum en maximum van je eerdere vergelijkbare tests; de stippellijn is hun gemiddelde.")} ${translate('benchmark.units')} ${safeText(model.note)}</desc><text class="benchmark-unit" x="0" y="15">WPM</text><text class="benchmark-unit" x="0" y="59">CPM</text>`;
-  if(model.kind==='external'){
+  const ticks=model.kind==='bands'?[0,30,60,80,100,120,140]:Array.from({length:5},(_,i)=>max*i/4);
+  let out=`<title>${safeText(model.title)} · ${safeText(benchmarkSpeed(model.wpm))}</title><desc>${model.kind==='bands'?translate("Indicatieve tempobanden. Een stippellijn markeert alleen het onderzoeksreferentiepunt wanneer dat beschikbaar is."):translate("Een lijn markeert het minimum en maximum van je eerdere vergelijkbare tests; de stippellijn is hun gemiddelde.")} ${translate('benchmark.units')} ${safeText(model.note)}</desc><text class="benchmark-unit" x="0" y="15">WPM</text><text class="benchmark-unit" x="0" y="59">CPM</text>`;
+  if(model.kind==='bands'){
     SPEED_BANDS.forEach(b=>{
       const active=b===model.band,a=x(b.min)+(b.min?2:0),z=x(Math.min(b.max,max))-2;
       out+=`<line class="benchmark-segment" x1="${n(a)}" x2="${n(z)}" y1="34" y2="34" stroke="${active?'var(--accent)':'var(--line)'}" stroke-width="${active?'2.4':'1.5'}"><title>${safeText(translate(b.label))} · ${safeText(bandRange(b))} WPM · ${safeText(bandRange(b,5))} CPM</title></line>`;
@@ -922,20 +1053,20 @@ function drawBenchmarkRuler(host,model,animate=true){
     for(const v of [model.min,model.max])out+=`<line x1="${n(x(v))}" x2="${n(x(v))}" y1="30" y2="38" stroke="var(--muted)" stroke-width="1"/>`;
   }
   ticks.forEach((v,i)=>{
-    const suffix=model.kind==='external'&&i===ticks.length-1?'+':'';
-    const xx=x(v),anchor=i===0?'start':model.kind==='external'?'middle':i===ticks.length-1?'end':'middle';
+    const suffix=model.kind==='bands'&&i===ticks.length-1?'+':'';
+    const xx=x(v),anchor=i===0?'start':model.kind==='bands'?'middle':i===ticks.length-1?'end':'middle';
     out+=`<line x1="${n(xx)}" x2="${n(xx)}" y1="30" y2="38" stroke="var(--line)" stroke-width="1"/><text class="benchmark-axis" x="${n(xx)}" y="15" text-anchor="${anchor}">${benchmarkNumber(v)}${suffix}</text><text class="benchmark-axis" x="${n(xx)}" y="59" text-anchor="${anchor}">${benchmarkNumber(v*5)}${suffix}</text>`;
   });
-  out+=`<line x1="${n(x(model.reference))}" x2="${n(x(model.reference))}" y1="21" y2="47" stroke="var(--muted)" stroke-width="1" stroke-dasharray="2 3"><title>${model.kind==='personal'?translate("Eigen gemiddelde"):translate("Afgerond onderzoeksgemiddelde")}: ${safeText(benchmarkSpeed(model.reference))}</title></line>`;
+  if(Number.isFinite(model.reference))out+=`<line x1="${n(x(model.reference))}" x2="${n(x(model.reference))}" y1="21" y2="47" stroke="var(--muted)" stroke-width="1" stroke-dasharray="2 3"><title>${translate("Afgerond onderzoeksgemiddelde")}: ${safeText(benchmarkSpeed(model.reference))}</title></line>`;
   const px=x(model.wpm);
   out+=`<g${animate?' class="benchmark-pin"':''}><title>${model.scoreLabel?safeText(model.scoreLabel):translate("Deze test")}: ${safeText(benchmarkSpeed(model.wpm))}</title><path d="M${n(px-3)},22 L${n(px)},26 L${n(px+3)},22" fill="none" stroke="var(--accent)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><line x1="${n(px)}" x2="${n(px)}" y1="26" y2="43" stroke="var(--accent)" stroke-width="1.2"/><circle cx="${n(px)}" cy="34" r="3" fill="var(--bg)" stroke="var(--accent)" stroke-width="1.6"/></g>`;
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.innerHTML=out;
 }
 function renderProgressBenchmark(rows,comparable){
-  if(progressMetric!=='wpm'||!comparableExternalBenchmark(rows,comparable)){renderBenchmark('progress-benchmark',null);return;}
+  if(progressMetric!=='wpm'||!comparableBandBenchmark(rows,comparable)){renderBenchmark('progress-benchmark',null);return;}
   const average=mean(rows.map(r=>r.wpm)),model=benchmarkModel({...rows[0],wpm:average});
   model.heading=translate("Gemiddeld tempo · deze selectie");model.scoreLabel=translate("Gemiddeld");
-  model.note=tp('benchmark.comparable',rows.length)+model.note;
+  model.note=(model.research?tp('benchmark.comparable',rows.length):tp('benchmark.comparable.mode',rows.length,{mode:resultModeLabel(rows[0])}))+model.note;
   renderBenchmark('progress-benchmark',model);
 }
 
@@ -1134,6 +1265,7 @@ function metricDisplay(value){return Number.isFinite(value)?(progressMetric==='w
 function mean(values){return values.length?values.reduce((a,b)=>a+b,0)/values.length:null;}
 function renderHistory(){
   refreshProfiles();
+  refreshCustomSelects();
   const rows=historySelection(),eligible=rows.filter(isCompleteResult),plotted=eligible.filter(r=>metricValue(r)!==null);
   const values=plotted.map(metricValue),average=mean(values),best=values.length?Math.max(...values):null;
   const labels={wpm:[translate("Je snelheid in beeld"),translate("Correcte tekens, omgerekend naar woorden per minuut.")],keystrokeAccuracy:[translate("Minder corrigeren, meer flow"),translate("Aanslagnauwkeurigheid, dus inclusief herstelde fouten.")],consistency:[translate("Je ritme in beeld"),translate("Hoe gelijkmatig je typt tijdens een test.")]};
@@ -1147,8 +1279,9 @@ function renderHistory(){
   $('history-time-note').textContent=translate('practice.minutes.'+(Math.round(minutes)===1?'one':'other'),{count:minutes&&minutes<1?'< 1':Math.round(minutes)});
   const adaptive=plotted.some(isAdaptive);
   const comparable=new Set(plotted.map(profileKey)).size===1 && plotted[0]?.mode!=='custom'&&!adaptive;
+  const benchmarkComparable=new Set(plotted.map(profileKey)).size===1;
   if(adaptive&&progressMetric==='wpm')$('history-best').textContent='—';
-  renderProgressBenchmark(plotted,comparable);
+  renderProgressBenchmark(plotted,benchmarkComparable);
   const excluded=rows.length-eligible.length;
   let explanation=translate("Grafiek en kerncijfers: volledige tests zonder onderbreking. Onder de grafiek staan ook verkorte of onderbroken tests.");
   if(excluded)explanation+=tp('progress.excluded',excluded);
@@ -2035,4 +2168,4 @@ $('code-tutorial-btn').onclick=()=>{
   $('code-tutorial-dialog').scrollTop=0;
 };
 
-applyInterface();newTest();
+applyInterface();setupCustomSelects();refreshCustomSelects();newTest();

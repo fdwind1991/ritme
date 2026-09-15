@@ -3,7 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const root=path.resolve(__dirname,'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
-const html=read('index.html'),css=read('polish.css'),js=read('polish.js');
+const html=read('index.html'),css=read('polish.css'),styles=read('styles.css'),js=read('polish.js');
 test('presentation assets are relative, ordered and content-versioned',()=>{
   for(const name of ['styles.css','polish.css','data.js','app.js','polish.js']){
     const hash=crypto.createHash('sha256').update(read(name)).digest('hex').slice(0,12);
@@ -35,4 +35,10 @@ test('size menu is anchored, and all interface languages have summary copy',()=>
   assert.match(js,/fontButton\.getBoundingClientRect\(\)/);
   for(const lang of ['nl','en','de'])assert.match(js,new RegExp(lang+': \\{ accuracy:'));
   assert.match(js,/summary\.textContent = summaryText\(r\)/);
+});
+test('focus styling stays on controls, not structural chart elements',()=>{
+  assert.match(styles,/button:focus-visible,a:focus-visible,select:focus-visible,[\s\S]*textarea:focus-visible,summary:focus-visible/);
+  assert.match(styles,/:where\(\[tabindex\]\):not\(button\):not\(a\):not\(input\):not\(select\):not\(textarea\):not\(summary\):focus-visible \{ outline:none; \}/);
+  assert.doesNotMatch(styles,/\[tabindex="0"\]:focus-visible/);
+  assert.doesNotMatch(css,/#chart:focus-visible|\.progress-dot:focus \.progress-marker/);
 });
