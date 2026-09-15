@@ -3,7 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const root=path.resolve(__dirname,'..'),file=path.join(root,'index.html');
 let html=fs.readFileSync(file,'utf8');
-for(const name of ['styles.css','data.js','app.js']) {
+for(const name of ['styles.css','polish.css','data.js','app.js','polish.js']) {
   const hash=crypto.createHash('sha256').update(fs.readFileSync(path.join(root,name))).digest('hex').slice(0,12);
   const rx=new RegExp('((?:src|href)="\\./'+name.replace('.', '\\.')+')(?:\\?v=[^"\\s]*)?("[>\\s/])','g');
   let count=0;

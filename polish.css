@@ -1,0 +1,89 @@
+/* Ritme · presentation polish. All palette and contrast tokens stay in styles.css. */
+.polish-ready .font-menu {
+  position:fixed; right:auto; top:var(--font-menu-top,57px); left:var(--font-menu-left,0px);
+  max-width:calc(100vw - 24px); animation:polish-menu-in .14s ease both;
+}
+@keyframes polish-menu-in { from { opacity:0; } to { opacity:1; } }
+
+/* Reserve the existing free-typing options row in every mode. Never move the
+   prompt to make room for controls during a mode switch. No new settings row. */
+.polish-options-slot { min-height:33px; display:flow-root; }
+.language-row { min-height:32px; }
+.language-meta > :not([hidden]),#word-activity-wrap:not([hidden]),
+#word-options:not([hidden]),#code-tutorial-btn:not([hidden]) {
+  animation:polish-context-in .16s var(--ease) both;
+}
+@keyframes polish-context-in {
+  from { opacity:0; transform:translateY(2px); }
+  to { opacity:1; transform:none; }
+}
+.live-metrics { transition:opacity .18s ease; }
+.running .live-metrics { transition-delay:.04s; }
+
+/* Use the actual existing keydown/up states, including Shift and numpad.
+   No input delay, moving letters, shake, or repeating target pulse. */
+.coach-key { transition-duration:.12s,.12s,.07s,.12s; }
+.coach-key.kb-down { transform:translateY(1px) scale(.98); }
+.coach-key.kb-next::before { animation:polish-target-in .12s ease-out both; }
+@keyframes polish-target-in { from { opacity:.35; } to { opacity:1; } }
+
+/* Parent view entry is replaced only for results, not Typing / Progress. */
+.polish-ready .results-view:not([hidden]) { animation:none; }
+.result-summary { margin:20px 0 0; max-width:78ch; color:var(--ink); font:11px/1.8 var(--mono); }
+.result-summary + .benchmark { margin-top:18px; }
+#result-wpm { position:relative; width:fit-content; }
+.polish-record #result-wpm { animation:polish-record-ink .6s ease both; }
+.polish-record #result-wpm::after {
+  content:''; position:absolute; left:0; right:0; bottom:-3px; height:1px;
+  background:var(--accent); transform-origin:left; animation:polish-record-line .6s var(--ease) both;
+}
+@keyframes polish-record-ink {
+  0%,100% { color:var(--strong); } 25%,70% { color:var(--accent); }
+}
+@keyframes polish-record-line {
+  0% { opacity:0; transform:scaleX(0); }
+  30%,70% { opacity:.7; transform:scaleX(1); }
+  100% { opacity:0; transform:scaleX(1); }
+}
+.progress-marker { transform-box:fill-box; transform-origin:center; transition:transform .1s ease; }
+.progress-dot:hover .progress-marker,.progress-dot:focus .progress-marker { transform:scale(1.25); }
+.result-point { fill:var(--net); stroke:var(--bg); stroke-width:1.5px; pointer-events:none; }
+#chart:focus-visible { outline:1px solid var(--accent); outline-offset:5px; }
+
+/* Two static icons crossfade; the target theme remains accessible via the
+   existing button label. No extra requests or icon font. */
+.theme-symbol { display:block; width:15px; height:15px; position:relative; }
+.theme-symbol svg { position:absolute; inset:0; width:15px; height:15px; transition:opacity .15s ease,transform .15s var(--ease); }
+.theme-sun { opacity:0; transform:rotate(-35deg); }
+.theme-moon { opacity:1; transform:none; }
+[data-theme="dark"] .theme-sun { opacity:1; transform:none; }
+[data-theme="dark"] .theme-moon { opacity:0; transform:rotate(35deg); }
+
+/* Native close()/Escape semantics stay synchronous. Supporting browsers keep
+   the top-layer paint for 140 ms; older browsers retain the existing entry. */
+@supports (transition-behavior:allow-discrete) {
+  dialog {
+    opacity:0; transform:translateY(4px);
+    transition:opacity .14s ease,transform .14s var(--ease),display .14s allow-discrete,overlay .14s allow-discrete;
+  }
+  dialog[open] { animation:none; opacity:1; transform:none; }
+  dialog::backdrop {
+    opacity:0;
+    transition:opacity .14s ease,display .14s allow-discrete,overlay .14s allow-discrete;
+  }
+  dialog[open]::backdrop { opacity:1; }
+  @starting-style {
+    dialog[open] { opacity:0; transform:translateY(6px); }
+    dialog[open]::backdrop { opacity:0; }
+  }
+}
+@media(max-width:600px) {
+  .language-row { min-height:32px; }
+  .result-summary { font-size:10px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  *,*::before,*::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; }
+  .coach-key.kb-down,.progress-dot .progress-marker { transform:none!important; }
+  .polish-record #result-wpm::after { display:none; }
+}
+@media print { .result-summary { color:inherit; } }
