@@ -220,6 +220,63 @@
       animate(marker,[{ opacity:0 },{ opacity:1 }],{ duration:220 }); pendingPoints.delete(r.id);
     });
   });
+  // A single underline survives character changes. Moving each letter's own
+  // ::after cannot interpolate between two different elements. Keep the cursor
+  // inside the track so native horizontal and animated vertical scrolling carry
+  // it with the text. This layer only reads geometry; input stays synchronous.
+  safely(() => {
+    const track = byId('word-track'), viewport = byId('typing-viewport');
+    const caret = document.createElement('span');
+    caret.className = 'polish-caret'; caret.setAttribute('aria-hidden','true'); caret.hidden = true;
+    let frame = 0, snap = true, previous = null;
+    function fallback() {
+      caret.hidden = true; track.classList.remove('polish-caret-ready'); previous = null;
+    }
+    function updateCaret() {
+      frame = 0;
+      try {
+        const target = track.querySelector('.current');
+        if (byId('test-view').hidden || document.hidden || !target || !target.getClientRects().length) { fallback(); return; }
+        const box = target.getBoundingClientRect(), origin = track.getBoundingClientRect();
+        const x = box.left-origin.left, y = box.bottom-origin.top+1, width = box.width;
+        if (![x,y,width].every(Number.isFinite) || width <= 0) { fallback(); return; }
+        const first = track.querySelector('.word');
+        // New prompts, reflow and recycled rows must never sweep across the
+        // screen. A real line break resets horizontally; the track still scrolls.
+        const jump = snap || reduced.matches || !previous || previous.first !== first || Math.abs(previous.y-y) > 1;
+        if (caret.parentNode !== track) track.append(caret);
+        caret.hidden = false;
+        if (jump) caret.style.transition = 'none';
+        caret.style.width = width+'px';
+        caret.style.color = getComputedStyle(target,'::after').backgroundColor;
+        caret.style.transform = `translate3d(${x}px,${y}px,0)`;
+        if (jump) { void caret.offsetWidth; caret.style.removeProperty('transition'); }
+        track.classList.add('polish-caret-ready');
+        previous = { x,y,first }; snap = false;
+      } catch (error) { fallback(); console.warn('Ritme cursor:',error); }
+    }
+    function queueCaret(reset = false) {
+      snap = snap || reset;
+      if (!frame) frame = requestAnimationFrame(updateCaret);
+    }
+    // Run once after the engine has finished each input/layout update, not on
+    // every character mutation or timer tick. Multiple changes share one frame.
+    after('scrollToCaret',() => queueCaret());
+    after('newTest',() => { fallback(); queueCaret(true); });
+    after('setView',() => { fallback(); queueCaret(true); });
+    after('applyAppearance',() => queueCaret(true));
+    if (window.ResizeObserver) new ResizeObserver(() => queueCaret(true)).observe(viewport);
+    window.addEventListener('resize',() => queueCaret(true),{ passive:true });
+    document.addEventListener('visibilitychange',() => {
+      if (document.hidden) { cancelAnimationFrame(frame); frame = 0; fallback(); }
+      else queueCaret(true);
+    });
+    const motionChanged = () => queueCaret(true);
+    if (reduced.addEventListener) reduced.addEventListener('change',motionChanged);
+    else reduced.addListener(motionChanged);
+    document.fonts?.ready.then(() => queueCaret(true));
+    queueCaret(true);
+  });
   document.body.classList.add('polish-ready');
   // Read-only presentation helpers for regression checks; no session controls.
   window.RitmePolish = Object.freeze({ summaryText,isNewRecord,positionFontMenu });

@@ -123,3 +123,23 @@ dialog, dialog * {
 @media (forced-colors:active) {
   dialog, dialog * { scrollbar-color:auto; scrollbar-width:auto; }
 }
+
+/* One shared underline; its geometry is maintained by polish.js. Hide the old
+   per-letter cursor only after the enhancement has measured a valid target. */
+.polish-caret-ready .char.current::after,
+.polish-caret-ready .gap.current::after { visibility:hidden; }
+.polish-caret {
+  position:absolute; top:0; left:0; display:block; height:2px;
+  pointer-events:none; user-select:none;
+  transition:transform .08s var(--ease),width .08s var(--ease);
+}
+.polish-caret::before {
+  content:''; position:absolute; inset:0; background:currentColor;
+  animation:cursor-breathe 1.15s ease-in-out infinite;
+}
+.running .polish-caret::before { animation:none; }
+@media(prefers-reduced-motion:reduce) {
+  .polish-caret { transition:none!important; }
+  .polish-caret::before { animation:none!important; }
+}
+@media print { .polish-caret { display:none; } }
