@@ -10,7 +10,7 @@ jobs:
     timeout-minutes: 8
     env:
       CHROMIUM_PATH: /usr/bin/google-chrome
-      RITME_CHECKS_DIR: ${{ runner.temp }}/ritme-checks
+      RITME_CHECKS_DIR: /tmp/ritme-checks
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Apply exact locally tested source
