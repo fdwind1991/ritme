@@ -52,6 +52,7 @@ const PUNCTUATION = [',', '.', ':', ';']; // The four marks in the supplied scre
 const STANDARD_CORPORA={"nl":{"sha256":"e540d93a5b53af931121e51201a7d0e472ae4c510901759f44f89a8028df6f96","count":199},"en":{"sha256":"8642149a168fe15fa385b8eab47f64ade34cfb60553059e83e448ab54af9e3dc","count":200},"de":{"sha256":"1ece918c3f3cfdd8f4224fe9114672843bc9b464cea087ad7446f25a39a9b0af","count":200},"fr":{"sha256":"0ab9a649d4182777913cdae8f4d18fab303a3bc9d21ef6ce56efeb4be9088f4b","count":174},"es":{"sha256":"3ca3866b34723b99bfd97e0e413d3e5f8d343b455860d2c4e86331fb68c16835","count":197},"it":{"sha256":"e708b6dafe9b03b8c13350abd556472d7d7a62c84a0dfa9ed6784c73d907526e","count":199}};
 const STORAGE_KEY = 'folkert-type-test-v1';
 const SETTINGS_KEY = 'folkert-type-settings-v1';
+const RECORDS_KEY = 'folkert-type-records-v1';
 let entropyCursor = 0;
 /** Fresh independent cryptographic input; the public build salt is not a PRNG seed. */
 function secureInt(max) {
@@ -66,14 +67,20 @@ function secureInt(max) {
   } while (value >= limit);
   return value % max;
 }
-let storageAvailable = true;
+const storageStatus = {settings:true,history:true,records:true};
+let historyDirty = false;
+function storageSlot(key){return key===STORAGE_KEY?'history':key===RECORDS_KEY?'records':'settings';}
+function updateStorageWarning(){
+  const warning=$('storage-warning');
+  if(warning)warning.hidden=storageStatus.settings&&storageStatus.history&&storageStatus.records&&!historyDirty;
+}
 function readLocal(key, fallback) {
   try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; }
-  catch { storageAvailable = false; return fallback; }
+  catch { storageStatus[storageSlot(key)]=false; updateStorageWarning(); return fallback; }
 }
 function writeLocal(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); storageAvailable=true; return true; }
-  catch { storageAvailable = false; return false; }
+  try { localStorage.setItem(key, JSON.stringify(value)); storageStatus[storageSlot(key)]=true; updateStorageWarning(); return true; }
+  catch { storageStatus[storageSlot(key)]=false; updateStorageWarning(); return false; }
 }
 /** Resolve the first supported browser preference, not a location or IP lookup.
  * Used only as defaults. Valid saved interface and test languages win below.
@@ -164,7 +171,7 @@ function setInterfaceLanguage(language){
   applyInterface();
   if(session){
     updateControls();updatePersonalBest();
-    $('accessible-prompt').textContent=translate('Over te typen: ')+session.words.slice(0,35).map(w=>w.text).join(' ');
+    updateAccessiblePrompt();
   }
   if(!$('results-view').hidden&&currentResult)showResult(currentResult,true);
   if(!$('progress-view').hidden)renderHistory();
@@ -174,7 +181,29 @@ function setInterfaceLanguage(language){
 
 const storedHistory = readLocal(STORAGE_KEY, []);
 let history = Array.isArray(storedHistory) ? storedHistory.filter(validResult).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,100) : [];
+const storedRecords = readLocal(RECORDS_KEY, {});
+let records = storedRecords && typeof storedRecords==='object' && !Array.isArray(storedRecords)
+  ? Object.fromEntries(Object.entries(storedRecords).filter(([,value])=>Number.isFinite(value)&&value>=0&&value<=100000).map(([key,value])=>[key,Number(value)]))
+  : {};
 function persistSettings(){ writeLocal(SETTINGS_KEY,settings); }
+function persistHistory(next){
+  const saved=writeLocal(STORAGE_KEY,next);
+  historyDirty=!saved;
+  updateStorageWarning();
+  return saved;
+}
+function persistRecords(){return writeLocal(RECORDS_KEY,records);}
+function rememberRecord(result){
+  if(!isCompleteResult(result)||isAdaptive(result)||isInfinitePractice(result))return;
+  const key=profileKey(result),best=Number(records[key]);
+  if(!Number.isFinite(best)||result.wpm>best){records[key]=result.wpm;persistRecords();}
+}
+function updateAccessiblePrompt(){
+  if(!session)return;
+  const words=session.words.slice(session.index,session.index+35);
+  const text=isCode(session.config)?words.map(word=>word.text).join('\n'):words.map(word=>word.text).join(' ');
+  $('accessible-prompt').textContent=translate('Over te typen: ')+text;
+}
 /** Capitalisation is a deterministic transform of a sampled dataset word.
  * Without punctuation: an independent 1-in-4 draw; only the initial letter changes.
  * With punctuation: first lexical word and the word after any generated mark.
@@ -564,7 +593,9 @@ function renderWord(index){
     n.chars[i].className=cl;
   }
   n.extras.replaceChildren();
-  for(const p of w.input.slice(w.chars.length)){const s=document.createElement('span');s.className='extra';s.textContent=p.ch;n.extras.append(s);}
+  const extraInput=w.input.slice(w.chars.length);
+  const visibleExtras=extraInput.slice(-256);
+  for(const p of visibleExtras){const s=document.createElement('span');s.className='extra';s.textContent=p.ch;n.extras.append(s);}
   n.gap.className='gap'+(w.submitted?(w.space?.good?' correct':' incorrect'):'')+(index===session.index && w.input.length>=w.chars.length?' current':'');
 }
 function syncCodeViewport(){
@@ -580,19 +611,21 @@ function scrollToCaret(){
   const viewport=$('typing-viewport'),track=$('word-track'),code=isCode(session?.config);
   syncCodeViewport();
   const lh=parseFloat(getComputedStyle(viewport).lineHeight);
-  const caret=code?node.el.querySelector('.current'):null;
+  const caret=node.el.querySelector('.current');
   const offset=Math.max(0,(caret?caret.getBoundingClientRect().top-track.getBoundingClientRect().top:node.el.offsetTop)-lh);
   track.style.setProperty('--scroll-y',-offset+'px');
   if(caret){
-    const bounds=viewport.getBoundingClientRect(),box=caret.getBoundingClientRect();
-    const gutter=node.el.querySelector('.code-line-number')?.offsetWidth||36;
-    // Native horizontal scrolling: source lines never visually become new lines.
-    if(box.right>bounds.right-12)viewport.scrollLeft+=box.right-bounds.right+12;
-    else if(box.left<bounds.left+gutter+8)viewport.scrollLeft=Math.max(0,viewport.scrollLeft+box.left-bounds.left-gutter-8);
-    if(session.current.input.length===0)viewport.scrollLeft=0;
-    // Anchor the native input close to the visible line for mobile focus handling.
-    $('capture').style.top=Math.min(viewport.clientHeight-20,Math.max(0,node.el.offsetTop-offset))+'px';
-    $('capture').style.left=Math.min(viewport.clientWidth-20,Math.max(0,gutter+8))+'px';
+    if(code){
+      const bounds=viewport.getBoundingClientRect(),box=caret.getBoundingClientRect();
+      const gutter=node.el.querySelector('.code-line-number')?.offsetWidth||36;
+      // Native horizontal scrolling: source lines never visually become new lines.
+      if(box.right>bounds.right-12)viewport.scrollLeft+=box.right-bounds.right+12;
+      else if(box.left<bounds.left+gutter+8)viewport.scrollLeft=Math.max(0,viewport.scrollLeft+box.left-bounds.left-gutter-8);
+      if(session.current.input.length===0)viewport.scrollLeft=0;
+      // Anchor the native input close to the visible line for mobile focus handling.
+      $('capture').style.top=Math.min(viewport.clientHeight-20,Math.max(0,node.el.offsetTop-offset))+'px';
+      $('capture').style.left=Math.min(viewport.clientWidth-20,Math.max(0,gutter+8))+'px';
+    }
   }
 }
 function focusTyping(){if(!$('test-view').hidden && !document.querySelector('dialog[open]'))$('capture').focus({preventScroll:true});}
@@ -632,7 +665,7 @@ function newTest(){
     const promptState={capitalizeNext:true};
     const words=mode==='custom'?customText.split(' '):makePrompt(config,isAdaptive(config)?48:180,0,promptState);
     session=new (isCode(config)?CodeTypingSession:TypingSession)(config,words,mode==='custom',promptState);appendNodes();renderWord(0);
-    $('accessible-prompt').textContent=translate("Over te typen: ")+words.slice(0,35).join(' ');
+    updateAccessiblePrompt();
     for(const id of ['live-dot','live-wpm','stop-btn'])$(id).hidden=true;
     if(['words','numbers','practice','code'].includes(mode)){settings.mode=mode;if(mode!=='numbers'&&mode!=='code')settings.wordPractice=mode==='practice';persistSettings();}
     updateControls();updatePersonalBest();window.scrollTo({top:0,behavior:'instant'});requestAnimationFrame(focusTyping);
@@ -696,7 +729,7 @@ function compactInfinitePractice(){
   if(cut){
     const track=$('word-track');track.classList.add('is-recycling');scrollToCaret();
     void track.offsetHeight;track.classList.remove('is-recycling');
-    $('accessible-prompt').textContent=translate('Over te typen: ')+session.words.slice(session.index,session.index+35).map(w=>w.text).join(' ');
+    updateAccessiblePrompt();
   }
 }
 function stopInfinitePractice(t=session?.elapsed()||0){
@@ -730,12 +763,12 @@ function insertText(text){
   }
   if(!wasRunning && session.running)startUi();
   for(let i=oldIndex;i<=session.index;i++)renderWord(i);
-  compactInfinitePractice();scrollToCaret();updateCoachTarget();
+  compactInfinitePractice();updateAccessiblePrompt();scrollToCaret();updateCoachTarget();
 }
 function eraseInput(word=false){
   if(!session?.running)return;
   if(session.elapsed()>=sessionLimit()){completeTest('time',sessionLimit());return;}
-  const old=session.index;session.erase(word);renderWord(old);renderWord(session.index);compactInfinitePractice();scrollToCaret();$('coach-target-issue').textContent='';updateCoachTarget();
+  const old=session.index;session.erase(word);renderWord(old);renderWord(session.index);compactInfinitePractice();updateAccessiblePrompt();scrollToCaret();$('coach-target-issue').textContent='';updateCoachTarget();
 }
 function completeTest(reason,t){
   if(!session || session.finished)return;
@@ -743,7 +776,7 @@ function completeTest(reason,t){
   if(isInfinitePractice(session.config)){stopInfinitePractice(t);return;}
   clearInterval(timerHandle);timerHandle=null;document.body.classList.remove('running');
   const result=session.finish(Math.max(t,.001),reason);
-  if(result.attempts){history.unshift(result);history=history.slice(0,100);if(!writeLocal(STORAGE_KEY,history))toast(translate("Opslag niet beschikbaar. Download een back-up via Voortgang → Beheer."));}
+  if(result.attempts){history.unshift(result);history=history.slice(0,100);rememberRecord(result);if(!persistHistory(history))toast(translate("Opslag niet beschikbaar. Download een back-up via Voortgang → Beheer."));}
   for(const dialog of document.querySelectorAll('dialog[open]'))dialog.close();
   showResult(result);$('announcer').textContent=translate('result.announce',{wpm:Math.round(result.wpm),accuracy:formatNumber(result.accuracy,1)});
 }
@@ -990,7 +1023,25 @@ function drawWeakSpots(result){
 /* ============================ Dialogs and history ========================== */
 function openDialog(id){closeTestInfo();$('font-menu').hidden=true;$('font-btn').setAttribute('aria-expanded','false');const d=$(id);if(!d.open)d.showModal();}
 function showHelp(tab='typing'){selectHelpTab(tab);openDialog('help-dialog');}
-function selectHelpTab(tab){document.querySelectorAll('[data-help-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.helpTab===tab)));for(const name of ['typing','scores','sources'])$('help-'+name).hidden=name!==tab;}
+function selectHelpTab(tab,focus=false){
+  document.querySelectorAll('[data-help-tab]').forEach(b=>{
+    const active=b.dataset.helpTab===tab;
+    b.setAttribute('aria-selected',String(active));
+    b.tabIndex=active?0:-1;
+    if(active&&focus)b.focus({preventScroll:true});
+  });
+  for(const name of ['typing','scores','sources'])$('help-'+name).hidden=name!==tab;
+}
+document.querySelectorAll('[data-help-tab]').forEach(tab=>tab.addEventListener('keydown',event=>{
+  const tabs=[...document.querySelectorAll('[data-help-tab]')],index=tabs.indexOf(tab);
+  let next=null;
+  if(event.key==='ArrowRight')next=tabs[(index+1)%tabs.length];
+  else if(event.key==='ArrowLeft')next=tabs[(index-1+tabs.length)%tabs.length];
+  else if(event.key==='Home')next=tabs[0];
+  else if(event.key==='End')next=tabs[tabs.length-1];
+  if(!next)return;
+  event.preventDefault();selectHelpTab(next.dataset.helpTab,true);
+}));
 
 function downloadFile(text,name,type){const blob=new Blob([text],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);}
 function exportHistory(){
@@ -1048,8 +1099,11 @@ function updatePersonalBest(){
   if(!session)return;
   if(isInfinitePractice(session.config)||isAdaptive(session.config)){$('personal-best').hidden=true;return;}
   const key=profileKey(session.config),candidates=history.filter(r=>isCompleteResult(r)&&profileKey(r)===key);
-  $('personal-best').hidden=!candidates.length;
-  if(candidates.length){$('pb-value').textContent=Math.round(Math.max(...candidates.map(r=>r.wpm)));$('pb-context').textContent=mode==='numbers'?translate('pb.numbers',{duration:session.config.duration}):`${resultLanguage(session.config)} · ${session.config.duration}s`;}
+  const stored=Number(records[key]),historyBest=candidates.length?Math.max(...candidates.map(r=>r.wpm)):0;
+  const best=Math.max(Number.isFinite(stored)?stored:0,historyBest);
+  if(best>0&&!Number.isFinite(stored)){records[key]=best;persistRecords();}
+  $('personal-best').hidden=best<=0;
+  if(best>0){$('pb-value').textContent=Math.round(best);$('pb-context').textContent=mode==='numbers'?translate('pb.numbers',{duration:session.config.duration}):`${resultLanguage(session.config)} · ${session.config.duration}s`;}
 }
 function refreshProfiles(){
   const select=$('history-filter'),previous=select.value,groups=new Map();
@@ -1106,7 +1160,7 @@ function renderHistory(){
   $('history-scroll').hidden=!rows.length;$('history-empty').hidden=!!rows.length;
   $('history-empty').textContent=history.length?translate("Geen tests voor deze selectie. Pas de instellingen of periode aan."):translate("Je afgeronde tests verschijnen hier vanzelf.");
   $('export-btn').disabled=!rows.length;$('backup-btn').disabled=!history.length;$('clear-history-btn').disabled=!history.length;
-  $('storage-warning').hidden=storageAvailable;
+  updateStorageWarning();
   $('history-rows').replaceChildren();
   for(const r of rows){
     const tr=document.createElement('tr'),date=new Date(r.date);
@@ -1147,8 +1201,8 @@ function deleteStoredResult(result){
   const index=history.findIndex(r=>sameStoredTest(r,result));
   if(index<0){toast(translate('history.delete.missing'));syncResultDeleteControl();return;}
   const next=history.slice();next.splice(index,1);
-  if(!writeLocal(STORAGE_KEY,next)){
-    $('storage-warning').hidden=false;toast(translate('history.delete.failed'));return;
+  if(!persistHistory(next)){
+    toast(translate('history.delete.failed'));return;
   }
   history=next;
   if(sameStoredTest(currentResult,result)){
@@ -1241,10 +1295,15 @@ function validResult(r){
   if(r.numberKeyboard!==undefined&&!['row','numpad'].includes(r.numberKeyboard))return false;
   if(r.numberAided!==undefined&&typeof r.numberAided!=='boolean')return false;
   if(r.practiceGuideVersion!==undefined&&(r.practiceGuideVersion!==1||r.mode!=='practice'||!['words','adaptive','home','top','bottom','letters','shift','digits','weak'].includes(r.practiceLesson)||typeof r.practiceAided!=='boolean'))return false;
+  if(r.practiceKeys!==undefined&&(!Array.isArray(r.practiceKeys)||r.practiceKeys.length>8||r.practiceKeys.some(key=>typeof key!=='string'||Array.from(key).length!==1)))return false;
   for(const key of ['accuracy','keystrokeAccuracy'])if(!Number.isFinite(r[key])||r[key]<0||r[key]>100)return false;
   if(r.consistency!==null&&(!Number.isFinite(r.consistency)||r.consistency<0||r.consistency>100))return false;
   for(const key of ['raw','cpm','typos','uncorrected','corrected'])if(!Number.isFinite(r[key])||r[key]<0||r[key]>10000000)return false;
-  return Array.isArray(r.samples)&&Array.isArray(r.errors)&&r.keys&&typeof r.keys==='object';
+  if(!Array.isArray(r.samples)||!Array.isArray(r.errors)||!r.keys||typeof r.keys!=='object'||Array.isArray(r.keys))return false;
+  if(Object.values(r.keys).some(value=>!value||typeof value!=='object'||!Number.isFinite(value.attempts)||!Number.isFinite(value.errors)||value.attempts<0||value.errors<0||value.errors>value.attempts))return false;
+  if(r.samples.some(sample=>!sample||!['t','burst','raw','net'].every(key=>Number.isFinite(sample[key])&&sample[key]>=0)))return false;
+  if(r.errors.some(error=>!error||typeof error.key!=='string'||!Number.isFinite(error.t)||error.t<0))return false;
+  return true;
 }
 function cleanImportedResult(r){
   if(!validResult(r))return null;
@@ -1288,21 +1347,49 @@ function parseCSV(text){
     return {version:1,id:'csv-'+o.datum+'-'+o.WPM,date:o.datum,language:o.taal,mode:o.modus||'words',duration:num(o.duur_seconden),plannedDuration:num(o.ingestelde_duur),wpm:num(o.WPM),raw:num(o.raw_WPM),cpm:num(o.CPM),accuracy:num(o.eindnauwkeurigheid_pct),keystrokeAccuracy:num(o.aanslagnauwkeurigheid_pct),consistency:o.consistency_pct===''?null:num(o.consistency_pct),typos:num(o.typefouten),uncorrected:num(o.ongecorrigeerd),corrected:num(o.verwijderde_typefouten),numbers:o.getallen==='true',punctuation:o.leestekens==='true',capitals:o.hoofdletters==='true',capitalPlacement:o.hoofdletterpositie==='initial'?'initial':'mixed',numberKeyboard:o.cijfertoetsenbord==='numpad'?'numpad':'row',numberAided:o.cijfertoetsenbord==='numpad'&&o.aanslaghulp==='true',reason:o.einde||'time',interrupted:o.onderbroken==='true',numberLength:o.cijferlengte||'mixed',...(o.vingergids_versie==='1'?{practiceGuideVersion:1,practiceLesson:o.oefening,practiceAided:o.aanslaghulp==='true',practiceKeys:(o.oefentoetsen||'').split('/').filter(Boolean)}:{}),...(o.toetsindeling?{keyboardLayout:o.toetsindeling}:{}),...(o.standaard_versie?{standardVersion:o.standaard_versie,corpusFingerprint:o.corpus_sha256,scoringVersion:o.score_versie||'ritme-output-v1'}:{}),...(o.adaptief_versie?{adaptiveVersion:Number(o.adaptief_versie)}:{}),...(o.woordenlijst_versie?{wordCorpusVersion:o.woordenlijst_versie,wordCorpusFingerprint:o.woordenlijst_sha256||undefined}:{}),...(o.code_versie?{codeVersion:o.code_versie,codeCorpusFingerprint:o.code_sha256,codeAided:o.code_aanslaghulp==='true'}:{}),samples:[],errors:[],keys:{},summaryOnly:true};
   });
 }
-function backupHistory(){downloadFile(JSON.stringify({format:'ritme-backup',version:3,exportedAt:new Date().toISOString(),settings:{...settings},results:history},null,2),'ritme-backup-'+new Date().toISOString().slice(0,10)+'.json','application/json');$('manage-menu').open=false;}
+function restoreBackupSettings(source){
+  if(!source||typeof source!=='object'||Array.isArray(source))return false;
+  if(['nl','en','de'].includes(source.uiLanguage))settings.uiLanguage=source.uiLanguage;
+  if([15,30,60,120].includes(source.duration))settings.duration=source.duration;
+  if([...LANGUAGES,'random'].includes(source.language))settings.language=source.language;
+  if([24,28,32,36].includes(source.size))settings.size=source.size;
+  if(['light','dark'].includes(source.theme))settings.theme=source.theme;
+  if(['words','numbers','practice','code'].includes(source.mode))settings.mode=source.mode;
+  if(['mixed','2','3','4','6'].includes(source.numberLength))settings.numberLength=source.numberLength;
+  if(['row','numpad'].includes(source.numberKeyboard))settings.numberKeyboard=source.numberKeyboard;
+  if(['words','adaptive','home','top','bottom','letters','shift','digits','weak'].includes(source.practiceLesson))settings.practiceLesson=source.practiceLesson;
+  if(Array.isArray(source.practiceKeys))settings.practiceKeys=source.practiceKeys.filter(key=>typeof key==='string'&&/^\p{L}$/u.test(key)).slice(0,8);
+  for(const key of ['numbers','punctuation','capitals','practiceKeyboard','practiceColors','practiceInfinite','standardTest','codeInfinite','codeGuide','wordPractice'])if(typeof source[key]==='boolean')settings[key]=source[key];
+  if(['us','de','fr'].includes(source.keyboardLayout))settings.keyboardLayout=source.keyboardLayout;
+  if(['wpm','cpm','kph'].includes(source.speedUnit))settings.speedUnit=source.speedUnit;
+  if(LANGUAGES.includes(source.standardLanguage))settings.standardLanguage=source.standardLanguage;
+  if(['basic','expanded'].includes(source.wordCorpus))settings.wordCorpus=source.wordCorpus;
+  if(CODE_LANGUAGES.includes(source.codeLanguage))settings.codeLanguage=source.codeLanguage;
+  mode=['words','numbers','practice','code'].includes(settings.mode)?settings.mode:mode;
+  practiceKeys=[...(settings.practiceKeys||[])];
+  persistSettings();applyInterface();newTest();
+  return true;
+}
+function backupHistory(){downloadFile(JSON.stringify({format:'ritme-backup',version:4,exportedAt:new Date().toISOString(),settings:{...settings},records:{...records},results:history},null,2),'ritme-backup-'+new Date().toISOString().slice(0,10)+'.json','application/json');$('manage-menu').open=false;}
 async function importHistoryFile(file){
   if(!file)return;
   try{
     if(file.size>8*1024*1024)throw new Error(translate("Dit bestand is te groot. Kies een back-up van maximaal 8 MB."));
-    const text=await file.text();let imported;
+    const text=await file.text();let imported,backupSettings=null,backupRecords=null;
     if(file.name.toLowerCase().endsWith('.csv'))imported=parseCSV(text);
-    else{const parsed=JSON.parse(text);imported=Array.isArray(parsed)?parsed:parsed.results||parsed.history;}
+    else{const parsed=JSON.parse(text);imported=Array.isArray(parsed)?parsed:parsed.results||parsed.history;backupSettings=Array.isArray(parsed)?null:parsed.settings;backupRecords=Array.isArray(parsed)?null:parsed.records;}
     if(!Array.isArray(imported)||imported.length>10000)throw new Error(translate("Geen geldige typetestgeschiedenis gevonden."));
     const cleaned=imported.map(cleanImportedResult).filter(Boolean);if(!cleaned.length)throw new Error(translate("Dit bestand bevat geen geldige testresultaten."));
     const signature=r=>[r.date,r.mode,r.duration,r.wpm,r.accuracy,profileKey(r),Number(usesCapitalization(r)),isNumpad(r)?'numpad':'row',isNumpad(r)?Number(!!r.numberAided):'',usesCapitalization(r)&&!r.punctuation?(r.capitalPlacement||'mixed'):''].join('|'),merged=new Map(history.map(r=>[signature(r),r]));let added=0;
     for(const r of cleaned){const key=signature(r),existing=merged.get(key);if(!existing){merged.set(key,r);added++;}else if(!existing.samples.length&&r.samples.length)merged.set(key,r);}
     history=[...merged.values()].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,100);
-    const saved=writeLocal(STORAGE_KEY,history);progressFilterInitialized=false;renderHistory();updatePersonalBest();
-    toast(tp('import.count',added)+(cleaned.length<imported.length?translate('import.skipped',{count:imported.length-cleaned.length}):'')+(saved?translate('Bestaande resultaten samengevoegd; de nieuwste 100 blijven bewaard.'):translate('Opslag niet beschikbaar: download een back-up vóór je sluit.')));
+    const saved=persistHistory(history);
+    if(backupRecords&&typeof backupRecords==='object'&&!Array.isArray(backupRecords))for(const [key,value] of Object.entries(backupRecords))if(Number.isFinite(value)&&value>=0&&value<=100000)records[key]=Math.max(Number(records[key])||0,value);
+    cleaned.forEach(rememberRecord);persistRecords();
+    const restoreSettings=backupSettings&&globalThis.confirm?.(translate('Deze back-up bevat ook instellingen. Herstel taal, thema, tekstgrootte en oefenkeuzes? Kies Annuleren om alleen de geschiedenis te importeren.'));
+    if(restoreSettings)restoreBackupSettings(backupSettings);
+    progressFilterInitialized=false;renderHistory();updatePersonalBest();
+    toast(tp('import.count',added)+(cleaned.length<imported.length?translate('import.skipped',{count:imported.length-cleaned.length}):'')+(saved?translate('Bestaande resultaten samengevoegd; de nieuwste 100 blijven bewaard.'):translate('Opslag niet beschikbaar: download een back-up vóór je sluit.'))+(restoreSettings?' '+translate('Back-upinstellingen hersteld.'):'') );
   }catch(error){toast(error instanceof SyntaxError?translate("Dit is geen geldig JSON-bestand. Kies een JSON-back-up of CSV-export."):error.message);}
   finally{$('import-file').value='';$('manage-menu').open=false;}
 }
@@ -1716,7 +1803,7 @@ $('sources-btn').onclick=()=>openFooterHelp('sources','sources-title');
 $('rules-btn').onclick=()=>openFooterHelp('scores');
 $('privacy-btn').onclick=()=>openFooterHelp('sources','privacy-title');
 $('history-btn').onclick=openHistory;$('result-history-btn').onclick=openHistory;$('history-filter').onchange=renderHistory;$('export-btn').onclick=exportHistory;
-$('clear-history-btn').onclick=()=>{$('manage-menu').open=false;askConfirm(translate("Geschiedenis wissen?"),translate("Alle opgeslagen tests worden verwijderd. Je instellingen blijven behouden. Download eerst een JSON-back-up als je de resultaten wilt bewaren."),translate("Wis alle tests"),()=>{if(!writeLocal(STORAGE_KEY,[])){toast(translate('history.delete.allFailed'));return;}history=[];progressFilterInitialized=false;syncResultDeleteControl();renderHistory();updatePersonalBest();toast(translate("Geschiedenis gewist."));});};
+$('clear-history-btn').onclick=()=>{$('manage-menu').open=false;askConfirm(translate("Geschiedenis wissen?"),translate("Alle opgeslagen tests worden verwijderd. Je instellingen blijven behouden. Download eerst een JSON-back-up als je de resultaten wilt bewaren."),translate("Wis alle tests"),()=>{if(!persistHistory([])){toast(translate('history.delete.allFailed'));return;}history=[];records={};persistRecords();historyDirty=false;updateStorageWarning();progressFilterInitialized=false;syncResultDeleteControl();renderHistory();updatePersonalBest();toast(translate("Geschiedenis gewist."));});};
 $('copy-btn').onclick=copyResult;
 $('credits-btn').onclick=()=>openFooterHelp('sources','credits-title');
 $('result-delete-btn').onclick=()=>{if(currentResult)requestDeleteResult(currentResult);};
@@ -1812,7 +1899,15 @@ $('backup-btn').onclick=backupHistory;$('import-btn').onclick=()=>{$('manage-men
 $('import-file').onchange=()=>importHistoryFile($('import-file').files[0]);
 $('export-btn').onclick=()=>{exportHistory();$('manage-menu').open=false;};
 document.addEventListener('pointerdown',event=>{if(!$('manage-menu').contains(event.target))$('manage-menu').open=false;});
-window.addEventListener('storage',event=>{if(event.key===STORAGE_KEY){const rows=readLocal(STORAGE_KEY,[]);if(Array.isArray(rows)){history=rows.filter(validResult).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,100);if(!$('progress-view').hidden)renderHistory();syncResultDeleteControl();updatePersonalBest();}}});
+window.addEventListener('storage',event=>{
+  if(event.key===null||event.key===STORAGE_KEY){
+    const rows=event.key===null?[]:readLocal(STORAGE_KEY,[]);
+    if(Array.isArray(rows)){history=rows.filter(validResult).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,100);historyDirty=false;storageStatus.history=true;if(!$('progress-view').hidden)renderHistory();syncResultDeleteControl();updatePersonalBest();updateStorageWarning();}
+  }
+  if(event.key===null||event.key===RECORDS_KEY){
+    records=event.key===null?{}:(readLocal(RECORDS_KEY,{})||{});storageStatus.records=true;updatePersonalBest();updateStorageWarning();
+  }
+});
 $('ui-language').addEventListener('change',()=>setInterfaceLanguage($('ui-language').value));
 $('word-activity').onchange=()=>{
  if(session?.running)return;

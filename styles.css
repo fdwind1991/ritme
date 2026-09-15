@@ -181,7 +181,7 @@ main { flex:1; width:100%; min-height:0; padding:29px 28px 64px; }
   user-select:none; -webkit-user-select:none;
 }
 .word-track { position:relative; transform:translateY(var(--scroll-y,0px)); transition:transform .19s var(--ease); will-change:transform; }
-.word { display:inline-block; white-space:nowrap; vertical-align:top; }
+.word { display:inline-block; max-width:100%; white-space:normal; overflow-wrap:anywhere; word-break:break-word; vertical-align:top; }
 .char,.gap,.extra { display:inline; position:relative; }
 .char,.gap { transition:color .075s ease; }
 .gap { white-space:pre; }
@@ -883,10 +883,11 @@ dialog::backdrop { background:#352a2138; backdrop-filter:blur(5px); -webkit-back
 /* v3.2 — code and richer word corpora. The normal typing surface is unchanged. */
 .code-settings { display:flex; align-items:center; }
 .code-settings select { border:0; background:transparent; color:var(--accent); font:inherit; padding:5px 2px; cursor:pointer; }
-.code-active .typing-viewport { font-size:min(var(--type-size),24px); line-height:1.65; height:330px; }
+.code-active .typing-viewport { font-size:var(--type-size); line-height:1.65; height:330px; }
 .code-active .word-track { padding-left:38px; }
 .code-active .code-line { display:block; position:relative; min-height:1.65em; white-space:pre-wrap; overflow-wrap:anywhere; }
-.code-active .code-line::before { content:attr(data-line); position:absolute; right:calc(100% + 13px); top:0; color:var(--faint); font-size:10px; line-height:calc(min(var(--type-size),24px)*1.65); text-align:right; pointer-events:none; }
+.code-active .code-line { max-width:none; }
+.code-active .code-line::before { content:attr(data-line); position:absolute; right:calc(100% + 13px); top:0; color:var(--faint); font-size:10px; line-height:calc(var(--type-size)*1.65); text-align:right; pointer-events:none; }
 .code-active .char[data-space] { white-space:pre-wrap; }
 .code-active .char[data-space]::before { content:'·'; position:absolute; color:var(--faint); opacity:.45; pointer-events:none; }
 .code-active .char[data-space].incorrect::before { color:var(--error); opacity:1; }
@@ -896,9 +897,9 @@ dialog::backdrop { background:#352a2138; backdrop-filter:blur(5px); -webkit-back
 .code-source-links { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:9px; margin-top:8px; }
 #code-guide-btn { padding:4px 0; }
 @media(max-width:600px){
-  .code-active .typing-viewport { font-size:18px; height:300px; }
+  .code-active .typing-viewport { font-size:var(--type-size); height:300px; }
   .code-active .word-track { padding-left:24px; }
-  .code-active .code-line::before { right:calc(100% + 7px); line-height:29.7px; font-size:9px; }
+  .code-active .code-line::before { right:calc(100% + 7px); line-height:calc(var(--type-size)*1.65); font-size:9px; }
   .mode-group button { padding-left:5px; padding-right:5px; }
 }
 
@@ -940,7 +941,7 @@ dialog::backdrop { background:#352a2138; backdrop-filter:blur(5px); -webkit-back
   #word-activity { max-width:140px; }
   .test-actions { flex-shrink:0; }
   .code-line-number { width:20px; padding-right:8px; font-size:9px; }
-  .code-active .typing-viewport { font-size:18px; }
+  .code-active .typing-viewport { font-size:var(--type-size); }
 }
 @media(max-width:360px){
   .language-row { gap:3px 5px; }
