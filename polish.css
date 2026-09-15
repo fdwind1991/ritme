@@ -92,3 +92,34 @@
 #results-view:focus {
   outline: none;
 }
+
+/* Native modal scrollbars, using the existing light/dark palette. No custom
+   scroll handlers or hidden scrollbars; nested code/text panes stay usable. */
+dialog { scrollbar-gutter:stable; overscroll-behavior:contain; }
+dialog, dialog * {
+  scrollbar-width:thin;
+  scrollbar-color:var(--muted) var(--bg);
+}
+/* Older WebKit: standards-based colors take precedence where supported. */
+@supports not (scrollbar-color:auto) {
+  @media (forced-colors:none) {
+    dialog::-webkit-scrollbar, dialog ::-webkit-scrollbar { width:10px; height:10px; }
+    dialog::-webkit-scrollbar-track, dialog ::-webkit-scrollbar-track,
+    dialog::-webkit-scrollbar-corner, dialog ::-webkit-scrollbar-corner { background:var(--bg); }
+    dialog::-webkit-scrollbar-thumb, dialog ::-webkit-scrollbar-thumb {
+      background:var(--muted); border:3px solid var(--bg);
+      border-radius:999px; min-height:32px; min-width:32px;
+    }
+    dialog::-webkit-scrollbar-thumb:hover, dialog ::-webkit-scrollbar-thumb:hover { background:var(--accent); }
+  }
+}
+/* Let touch and high-contrast users retain the platform's normal width. */
+@media (pointer:coarse) {
+  dialog, dialog * { scrollbar-width:auto; }
+  @supports not (scrollbar-color:auto) {
+    dialog::-webkit-scrollbar, dialog ::-webkit-scrollbar { width:14px; height:14px; }
+  }
+}
+@media (forced-colors:active) {
+  dialog, dialog * { scrollbar-color:auto; scrollbar-width:auto; }
+}
