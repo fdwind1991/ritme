@@ -1372,7 +1372,7 @@ function renderHistory(){
       ?translate('progress.speed.subtitle.kph')
       :translate("Correcte tekens, omgerekend naar woorden per minuut.");
   const labels={wpm:[translate("Je snelheid in beeld"),speedSubtitle],keystrokeAccuracy:[translate("Minder corrigeren, meer flow"),translate("Aanslagnauwkeurigheid, dus inclusief herstelde fouten.")],consistency:[translate("Je ritme in beeld"),translate("Hoe gelijkmatig je typt tijdens een test.")]};
-  $('speed-unit').value=settings.speedUnit;$('speed-unit-wrap').hidden=progressMetric!=='wpm';
+  $('speed-unit').value=settings.speedUnit;$('speed-unit-wrap').hidden=progressMetric!=='wpm';refreshCustomSelect($('speed-unit'));
   $('progress-chart-title').textContent=labels[progressMetric][0];$('progress-chart-subtitle').textContent=labels[progressMetric][1];
   $('history-last').textContent=metricDisplay(values[0]);$('history-median').textContent=metricDisplay(average);$('history-best').textContent=metricDisplay(best);$('history-count').textContent=eligible.length;
   document.querySelectorAll('.progress-unit').forEach(e=>e.textContent=progressMetric==='wpm'?speedUnit():'%');

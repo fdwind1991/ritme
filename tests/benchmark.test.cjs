@@ -32,3 +32,7 @@ test('progress speed subtitle follows the selected unit',()=>{
   assert.match(data,/"progress\.speed\.subtitle\.cpm"/);
   assert.match(data,/"progress\.speed\.subtitle\.kph"/);
 });
+
+test('progress speed selector refreshes after applying the stored unit',()=>{
+  assert.match(app,/\$\('speed-unit'\)\.value=settings\.speedUnit;\$\('speed-unit-wrap'\)\.hidden=progressMetric!==['"]wpm['"];refreshCustomSelect\(\$\('speed-unit'\)\)/);
+});
