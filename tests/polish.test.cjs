@@ -22,6 +22,7 @@ test('motion has native and JavaScript reduced-motion paths',()=>{
   assert.match(css,/@media\(prefers-reduced-motion:reduce\)/);
   assert.match(css,/animation:none!important; transition:none!important/);
   assert.match(js,/reduced\.matches/);assert.match(js,/animation\.cancel\(\)/);
+  assert.match(js,/function animateStroke\(/);assert.match(js,/strokeDashoffset/);
   assert.match(css,/overlay \.14s allow-discrete/);
 });
 test('presentation cannot write scores, settings or generate prompts',()=>{

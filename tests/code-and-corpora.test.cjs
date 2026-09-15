@@ -53,6 +53,10 @@ test('infinite code compaction does not change lifetime totals',()=>{
 test('control characters are rejected instead of becoming invisible input',()=>{
  const s=new Session(config(),['x']);assert.equal(s.insert('\t',0),false);assert.equal(s.insert('\r',0),false);assert.equal(s.started,null);
 });
+test('coding mode maps Tab to four-space indentation',()=>{
+ assert.match(src,/const CODE_TAB\s*=\s*' '\.repeat\(4\)/);
+ assert.match(src,/event\.key==='Tab'&&isCode\(session\?\.config\)\)\{event\.preventDefault\(\);insertText\(CODE_TAB\);return;\}/);
+});
 test('Standard v1 original word-list hashes remain unchanged',()=>{
  const fingerprints=JSON.parse(src.match(/const STANDARD_CORPORA=(\{[^;]+\});/)[1]);
  for(const [lang,corpus] of Object.entries(data.lexicons)){assert.equal(sha(corpus.words.join('\n')),fingerprints[lang].sha256,lang);assert.equal(corpus.words.length,fingerprints[lang].count,lang);}

@@ -32,9 +32,9 @@
 </script>
 <link rel="stylesheet" href="./styles.css?v=21cacacec23b"/>
 <link rel="stylesheet" href="./polish.css?v=8f35d5044a22"/>
-<script src="./data.js?v=61313aec61f6" defer></script>
-<script src="./app.js?v=0def698285f7" defer></script>
-<script src="./polish.js?v=930e73632609" defer></script>
+<script src="./data.js?v=2ca071b2b27f" defer></script>
+<script src="./app.js?v=518f901bf82d" defer></script>
+<script src="./polish.js?v=173b9385a153" defer></script>
 </head>
 <body>
 <header class="topbar">
@@ -60,7 +60,7 @@
 <p data-i18n="practice.drill.note" hidden="" id="test-info-drill"></p>
 <section class="test-info-section" hidden="" id="test-info-capitals"><h3 data-i18n="capitals.label">hoofdletters</h3><p class="capitalization-hint" hidden="" id="capitalization-hint"></p></section>
 <section class="test-info-section" id="test-info-corpus" hidden><label class="layout-choice"><span data-i18n="corpus.label">Woordenlijst</span><select id="word-corpus"><option value="basic" data-i18n="corpus.basic">Basis</option><option value="expanded" data-i18n="corpus.expanded">Uitgebreid</option></select></label><p id="corpus-detail"></p></section>
-<section class="test-info-section" id="test-info-code" hidden><h3 data-i18n="code.label">Code</h3><p data-i18n="code.keys">Enter voor een nieuwe regel. Typ inspringing met spaties; Tab blijft navigatie.</p><p id="code-detail"></p><button type="button" class="option-toggle" id="code-guide-btn" aria-pressed="false"><span class="practice-check" aria-hidden="true"></span><span data-i18n="code.guidance">Toetsenbordhulp</span></button><div id="code-source-links" class="code-source-links"></div></section>
+<section class="test-info-section" id="test-info-code" hidden><h3 data-i18n="code.label">Code</h3><p data-i18n="code.keys">Enter voor een nieuwe regel. Tab voegt vier spaties toe voor inspringing.</p><p id="code-detail"></p><button type="button" class="option-toggle" id="code-guide-btn" aria-pressed="false"><span class="practice-check" aria-hidden="true"></span><span data-i18n="code.guidance">Toetsenbordhulp</span></button><div id="code-source-links" class="code-source-links"></div></section>
 <section class="test-info-section" id="test-info-layout"><label class="layout-choice"><span data-i18n="layout.heading">Toetsenbordindeling</span><select aria-label="Toetsenbordindeling" data-i18n-aria-label="layout.heading" id="keyboard-layout"><option value="us">QWERTY · US</option><option value="de">QWERTZ · DE</option><option value="fr">AZERTY · FR</option></select></label><p data-i18n="layout.note">De gids volgt deze indeling, niet de testtaal.</p></section>
 <section class="test-info-section" hidden="" id="test-info-standard"><h3 data-i18n="standard.heading">Standaard · v1</h3><p data-i18n="standard.info"></p><p id="standard-corpus"></p></section>
 <section class="test-info-section" hidden="" id="test-info-adaptive"><h3 data-i18n="practice.lesson.adaptive">Adaptief</h3><p id="adaptive-status"></p><p id="adaptive-detail"></p></section><section class="test-info-section" hidden="" id="test-info-guidance"><h3 data-i18n="test.info.guidance">Aanslaghulp</h3><p data-i18n="test.info.guidance.copy" id="test-info-guidance-copy"></p><div class="keyboard-meta"><span data-i18n="practice.layout" id="coach-layout">US QWERTY · geen numpad</span><span data-i18n="practice.homehint" id="coach-homehint">F + J · voel de rustpunten</span></div></section>
@@ -185,7 +185,7 @@
 <pre class="tutorial-example" id="code-tutorial-example" aria-label="Voorbeeld" data-i18n-aria-label="code.tutorial.example"></pre>
 <ol class="tutorial-steps">
 <li><h3 data-i18n="code.tutorial.lines.title">Enter bij ↵</h3><p data-i18n="code.tutorial.lines">Elke genummerde regel is één echte coderegel. Druk bij ↵ op Enter, ook op een lege regel. Lange regels schuiven horizontaal mee met je cursor; je mag ook zelf opzij scrollen.</p></li>
-<li><h3 data-i18n="code.tutorial.spaces.title">Elke · is één spatie</h3><p data-i18n="code.tutorial.spaces">Typ ook de spaties vóór de code. Er is geen automatische inspringing. Tab verplaatst de focus naar de bediening; gebruik spaties om in te springen.</p></li>
+<li><h3 data-i18n="code.tutorial.spaces.title">Elke · is één spatie</h3><p data-i18n="code.tutorial.spaces">Typ ook de spaties vóór de code. Er is geen automatische inspringing. Tab voegt vier spaties toe; gebruik Tab of losse spaties om in te springen.</p></li>
 <li><h3 data-i18n="code.tutorial.exact.title">Hoofdletters en tekens tellen mee</h3><p data-i18n="code.tutorial.exact">Neem hoofdletters, haakjes en aanhalingstekens precies over. Backspace corrigeert en kan terug naar de vorige regel. Te vroeg Enter telt ontbrekende tekens als fout.</p></li>
 <li><h3 data-i18n="code.tutorial.feedback.title">Wel feedback, geen druk</h3><p data-i18n="code.tutorial.feedback">De klok start bij je eerste aanslag. Je ziet live WPM en aanslagnauwkeurigheid. Met ∞ krijg je na Stop een tijdelijk overzicht, zonder opgeslagen score. Een getimede test wordt wel opgeslagen.</p></li>
 </ol>

@@ -53,6 +53,7 @@ const STANDARD_CORPORA={"nl":{"sha256":"e540d93a5b53af931121e51201a7d0e472ae4c51
 const STORAGE_KEY = 'folkert-type-test-v1';
 const SETTINGS_KEY = 'folkert-type-settings-v1';
 const RECORDS_KEY = 'folkert-type-records-v1';
+const CODE_TAB = ' '.repeat(4);
 let entropyCursor = 0;
 /** Fresh independent cryptographic input; the public build salt is not a PRNG seed. */
 function secureInt(max) {
@@ -451,8 +452,9 @@ class TypingSession {
 
 
 /** Code mode is line-aware. Spaces are characters, Enter ends a logical line.
- * Display markers/line numbers are never counted. There is no evaluation,
- * auto-completion or auto-indentation. A premature Enter records omissions.
+ * Display markers/line numbers are never counted. Tab inserts four spaces.
+ * There is no evaluation, auto-completion or automatic indentation. A
+ * premature Enter records omissions.
  */
 class CodeTypingSession extends TypingSession {
   addWords(lines){
@@ -953,9 +955,9 @@ function drawChart(result){
   const points=key=>result.samples.map(s=>`${x(s.t).toFixed(2)},${y(s[key]).toFixed(2)}`).join(' ');
   if(result.samples.length){
     const first=result.samples[0],last=result.samples[result.samples.length-1];
-    out+=`<g data-layer="burst"><polygon points="${x(first.t)},${y(0)} ${points('burst')} ${x(last.t)},${y(0)}" fill="var(--burst)" fill-opacity=".11"/><polyline points="${points('burst')}" fill="none" stroke="var(--burst)" stroke-width=".9" stroke-linejoin="round"/></g>`;
-    out+=`<g data-layer="raw"><polyline points="${points('raw')}" fill="none" stroke="var(--raw)" stroke-width="1.15" stroke-dasharray="5 3" stroke-linejoin="round"/></g>`;
-    out+=`<g data-layer="net"><polyline points="${points('net')}" fill="none" stroke="var(--net)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>`;
+    out+=`<g data-layer="burst"><polygon class="chart-area" points="${x(first.t)},${y(0)} ${points('burst')} ${x(last.t)},${y(0)}" fill="var(--burst)" fill-opacity=".11"/><polyline class="chart-series" points="${points('burst')}" fill="none" stroke="var(--burst)" stroke-width=".9" stroke-linejoin="round"/></g>`;
+    out+=`<g data-layer="raw"><polyline class="chart-series" points="${points('raw')}" fill="none" stroke="var(--raw)" stroke-width="1.15" stroke-dasharray="5 3" stroke-linejoin="round"/></g>`;
+    out+=`<g data-layer="net"><polyline class="chart-series" points="${points('net')}" fill="none" stroke="var(--net)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>`;
   }
   // Aggregate crossings by second, without inventing or duplicating error events.
   for(const resolved of [true,false]){
@@ -1245,8 +1247,8 @@ function drawProgressChart(rows,comparable){
   if(showReference)out+=`<line x1="${L}" x2="${W-R}" y1="${n(y(SPEED_REFERENCE.wpm*speedFactor()))}" y2="${n(y(SPEED_REFERENCE.wpm*speedFactor()))}" stroke="var(--muted)" stroke-width=".9" stroke-dasharray="3 5" opacity=".7"><title>${translate('progress.studyReference')}</title></line>`;
   const ticks=rows.length===1?[0]:[...new Set(Array.from({length:Math.min(6,rows.length)},(_,i)=>Math.round(i*(rows.length-1)/(Math.min(6,rows.length)-1))))];
   for(const i of ticks)out+=`<text class="chart-label" x="${n(x(i))}" y="${H-9}" text-anchor="middle">#${i+1}</text>`;
-  if(rows.length>1){const pts=values.map((v,i)=>`${n(x(i))},${n(y(v))}`).join(' ');out+=`<polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-opacity=".32" stroke-width="1.25" stroke-linejoin="round"/>`;}
-  if(hasTrend){const points=rolling.map((v,i)=>v===null?null:`${n(x(i))},${n(y(v))}`).filter(Boolean).join(' ');out+=`<polygon points="${n(x(4))},${n(y(lo))} ${points} ${n(x(rows.length-1))},${n(y(lo))}" fill="url(#progress-fill)"/><polyline points="${points}" fill="none" stroke="var(--net)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;if(rows.length===5)out+=`<circle cx="${n(x(4))}" cy="${n(y(rolling[4]))}" r="3" fill="var(--net)"/>`;}
+  if(rows.length>1){const pts=values.map((v,i)=>`${n(x(i))},${n(y(v))}`).join(' ');out+=`<polyline class="progress-series" points="${pts}" fill="none" stroke="var(--accent)" stroke-opacity=".32" stroke-width="1.25" stroke-linejoin="round"/>`;}
+  if(hasTrend){const points=rolling.map((v,i)=>v===null?null:`${n(x(i))},${n(y(v))}`).filter(Boolean).join(' ');out+=`<polygon class="progress-area" points="${n(x(4))},${n(y(lo))} ${points} ${n(x(rows.length-1))},${n(y(lo))}" fill="url(#progress-fill)"/><polyline class="progress-series" points="${points}" fill="none" stroke="var(--net)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;if(rows.length===5)out+=`<circle cx="${n(x(4))}" cy="${n(y(rolling[4]))}" r="3" fill="var(--net)"/>`;}
   values.forEach((v,i)=>{const last=i===values.length-1;out+=`<g class="progress-dot" data-point="${i}" tabindex="0" role="button" aria-label="${safeText(translate('progress.pointAria',{date:new Date(rows[i].date).toLocaleString(uiLocale()),value:metricDisplay(v),unit:percent?translate('procent'):speedUnit()}))}"><circle cx="${n(x(i))}" cy="${n(y(v))}" r="12" fill="transparent" stroke="none"/><circle class="progress-marker" cx="${n(x(i))}" cy="${n(y(v))}" r="${last?4.5:3.1}" fill="${last?'var(--accent)':'var(--panel)'}" stroke="var(--accent)" stroke-width="1.5"/></g>`;});
   svg.innerHTML=out;
   $('progress-average-key').hidden=!hasTrend;
@@ -1838,6 +1840,7 @@ $('capture').addEventListener('blur',()=>{if(session?.running && !$('test-view')
 $('capture').addEventListener('keydown',event=>{
   $('caps-warning').hidden=!event.getModifierState('CapsLock');handleCoachKeydown(event);
   if(event.isComposing || event.key==='Dead' || event.key==='Process')return;
+  if(event.key==='Tab'&&isCode(session?.config)){event.preventDefault();insertText(CODE_TAB);return;}
   if(event.key==='Backspace'){event.preventDefault();eraseInput(event.ctrlKey||event.altKey||event.metaKey);return;}
   if(event.key==='Enter'){event.preventDefault();insertText(isCode(session?.config)?'\n':' ');return;}
   if(event.key==='Delete'){event.preventDefault();return;}

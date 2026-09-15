@@ -38,6 +38,24 @@
     animation.finished.then(() => animations.delete(animation), () => animations.delete(animation));
     return animation;
   }
+  function animateStroke(element, duration, delay = 0) {
+    if (!element || reduced.matches) return;
+    let length;
+    try { length = element.getTotalLength(); }
+    catch { return; }
+    if (!Number.isFinite(length) || length <= 0) return;
+    const cleanup = () => { element.style.removeProperty('stroke-dasharray'); element.style.removeProperty('stroke-dashoffset'); };
+    element.style.strokeDasharray = String(length);
+    element.style.strokeDashoffset = String(length);
+    const animation = animate(element,[{strokeDashoffset:length},{strokeDashoffset:0}],{duration,delay,easing:'cubic-bezier(.22,.61,.36,1)'});
+    if (animation) animation.finished.then(cleanup,cleanup); else cleanup();
+  }
+  function animateChartInk(svg, lineSelector, areaSelector, duration = 620) {
+    if (!svg || reduced.matches) return;
+    [...svg.querySelectorAll(lineSelector)].forEach((line,index) => animateStroke(line,duration,index*85));
+    const area = svg.querySelector(areaSelector);
+    if (area) animate(area,[{opacity:0},{opacity:1}],{duration:420,delay:100});
+  }
   function cancelAnimations() {
     for (const animation of animations) animation.cancel();
     animations.clear();
@@ -207,12 +225,14 @@
     };
   }
   after('drawChart',enhanceChart);
+  after('drawChart',() => requestAnimationFrame(() => animateChartInk(byId('chart'),'.chart-series','.chart-area',540)));
   document.querySelector('[data-series="net"]').addEventListener('click',() => {
     const point = byId('chart').querySelector('.result-point');
     if (point && !shownSeries.net) point.setAttribute('opacity','0');
   });
   after('drawProgressChart',rows => {
     if (byId('progress-view').hidden) return;
+    animateChartInk(byId('progress-chart'),'.progress-series','.progress-area',680);
     rows.forEach((r,index) => {
       if (!pendingPoints.has(r.id)) return;
       const marker = byId('progress-chart').querySelector('[data-point="'+index+'"] .progress-marker');

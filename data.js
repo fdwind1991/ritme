@@ -3946,19 +3946,19 @@ const RITME_DATA = {
       "de": "Keine Codebeispiele verfügbar."
     },
     "code.info": {
-      "nl": "Typ codefragmenten over, inclusief spaties, hoofdletters, symbolen en nieuwe regels. Er wordt nooit code uitgevoerd.",
-      "en": "Copy code snippets, including spaces, case, symbols and line breaks. Code is never executed.",
-      "de": "Tippe Codebeispiele mit Leerzeichen, Großschreibung, Symbolen und Zeilenumbrüchen ab. Code wird niemals ausgeführt."
+      "nl": "Typ codefragmenten over, inclusief spaties, hoofdletters, symbolen, Tab-inspringing en nieuwe regels. Er wordt nooit code uitgevoerd.",
+      "en": "Copy code snippets, including spaces, case, symbols, Tab indentation and line breaks. Code is never executed.",
+      "de": "Tippe Codebeispiele mit Leerzeichen, Großschreibung, Symbolen, Tab-Einrückung und Zeilenumbrüchen ab. Code wird niemals ausgeführt."
     },
     "code.keys": {
-      "nl": "Enter ↵ voor een nieuwe regel. Typ inspringing met spaties; Tab blijft navigatie. Geen automatische aanvulling.",
-      "en": "Enter ↵ starts a new line. Type indentation with spaces; Tab remains navigation. No auto-completion.",
-      "de": "Enter ↵ beginnt eine neue Zeile. Einrückung mit Leerzeichen tippen; Tab dient der Navigation. Keine automatische Ergänzung."
+      "nl": "Enter ↵ voor een nieuwe regel. Tab voegt vier spaties toe voor inspringing. Geen automatische aanvulling.",
+      "en": "Enter ↵ starts a new line. Tab inserts four spaces for indentation. No auto-completion.",
+      "de": "Enter ↵ beginnt eine neue Zeile. Tab fügt vier Leerzeichen zum Einrücken ein. Keine automatische Ergänzung."
     },
     "code.detail": {
-      "nl": "{count} gepubliceerde fragmenten. Regelnummering en zichtbare spatietekens tellen niet mee. Elke zelf getypte spatie en Enter telt als één teken. Een vroege Enter telt ontbrekende tekens als fout.",
-      "en": "{count} published snippets. Line numbers and whitespace hints are not counted. Each typed space and Enter counts as one character. An early Enter counts missing characters as errors.",
-      "de": "{count} veröffentlichte Beispiele. Zeilennummern und Leerzeichenmarkierungen zählen nicht mit. Jedes getippte Leerzeichen und Enter zählt als ein Zeichen. Frühes Enter zählt fehlende Zeichen als Fehler."
+      "nl": "{count} gepubliceerde fragmenten. Regelnummering en zichtbare spatietekens tellen niet mee. Elke zelf getypte spatie en Enter telt als één teken; Tab staat voor vier spaties. Een vroege Enter telt ontbrekende tekens als fout.",
+      "en": "{count} published snippets. Line numbers and whitespace hints are not counted. Each typed space and Enter counts as one character; Tab represents four spaces. An early Enter counts missing characters as errors.",
+      "de": "{count} veröffentlichte Beispiele. Zeilennummern und Leerzeichenmarkierungen zählen nicht mit. Jedes getippte Leerzeichen und Enter zählt als ein Zeichen; Tab steht für vier Leerzeichen. Frühes Enter zählt fehlende Zeichen als Fehler."
     },
     "code.benchmark": {
       "nl": "Code is niet vergelijkbaar met gewone woorden. Vergelijk je eigen code-sessies met dezelfde taal, duur, toetsindeling, hulp en fragmentversie. Dit meet typen, niet programmeervaardigheid.",
@@ -4086,9 +4086,9 @@ const RITME_DATA = {
       "de": "Jeder · ist ein Leerzeichen"
     },
     "code.tutorial.spaces": {
-      "nl": "Typ ook de spaties vóór de code. Er is geen automatische inspringing. Tab verplaatst de focus naar de bediening; gebruik spaties om in te springen.",
-      "en": "Type the spaces before the code too. There is no automatic indentation. Tab moves focus to the controls; use spaces to indent.",
-      "de": "Tippe auch die Leerzeichen vor dem Code. Es gibt keinen automatischen Einzug. Tab wechselt zu den Bedienelementen; verwende Leerzeichen zum Einrücken."
+      "nl": "Typ ook de spaties vóór de code. Er is geen automatische inspringing. Tab voegt vier spaties toe; gebruik Tab of losse spaties om in te springen.",
+      "en": "Type the spaces before the code too. There is no automatic indentation. Tab inserts four spaces; use Tab or individual spaces to indent.",
+      "de": "Tippe auch die Leerzeichen vor dem Code. Es gibt keinen automatischen Einzug. Tab fügt vier Leerzeichen ein; verwende Tab oder einzelne Leerzeichen zum Einrücken."
     },
     "code.tutorial.exact.title": {
       "nl": "Hoofdletters en tekens tellen mee",
