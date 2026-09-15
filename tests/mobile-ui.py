@@ -49,7 +49,7 @@ try:
       target.wait_for_function('typeof session!=="undefined" && !!session');target.wait_for_timeout(250)
       return target
     page=load()
-    check('Current release loads real CSS and scripts',page.evaluate("APP_RELEASE==='3.2.2'&&RITME_DATA.release===APP_RELEASE&&!$('fatal-error').hidden===false"))
+    check('Current release loads real CSS and scripts',page.evaluate("APP_RELEASE===document.querySelector('meta[name=ritme-release]').content&&RITME_DATA.release===APP_RELEASE&&!$('fatal-error').hidden===false"))
     for lang in ['nl','en','de']:
       page.select_option('#ui-language',lang)
       check('Exercise optgroup '+lang,page.locator('#word-activity optgroup').get_attribute('label')==page.evaluate("translate('practice.mode')"))

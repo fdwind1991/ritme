@@ -6,7 +6,7 @@
  */
 'use strict';
 const RITME_DATA = {
-  "release": "3.2.2",
+  "release": "3.2.3",
   "lexicons": {
     "nl": {
       "name": "Nederlands",
@@ -3016,9 +3016,9 @@ const RITME_DATA = {
       "de": "Oberfläche und Testsprache"
     },
     "help.interface.copy": {
-      "nl": "Met NL / ENG / DE rechtsboven wijzig je alleen de interface. Je testtaal, woorden, cijfers en resultaten blijven gelijk. De voorkeur wordt lokaal onthouden. De CSV-kolomnamen blijven voor uitwisselbaarheid hetzelfde in alle interfacetalen.",
-      "en": "NL / ENG / DE at the top right changes only the interface. Your test language, words, numbers and results stay the same. The preference is saved locally. CSV column names remain the same in every interface language for compatibility.",
-      "de": "NL / ENG / DE oben rechts ändert nur die Oberfläche. Testsprache, Wörter, Zahlen und Ergebnisse bleiben gleich. Die Auswahl wird lokal gespeichert. CSV-Spaltennamen bleiben aus Kompatibilitätsgründen in jeder Oberflächensprache gleich."
+      "nl": "Bij je eerste bezoek volgt de interface de eerste ondersteunde browsertaal (NL / ENG / DE); anders wordt Engels gebruikt. De eerste woordtest begint in dezelfde taal. Je voorkeuren worden lokaal onthouden. Met NL / ENG / DE rechtsboven wijzig je daarna alleen de interface, zonder je testtaal, lopende test of resultaten te veranderen. Een opgeslagen keuze gaat altijd voor de browsertaal. De CSV-kolomnamen blijven voor uitwisselbaarheid hetzelfde in alle interfacetalen.",
+      "en": "On your first visit, the interface follows the first supported browser language (NL / ENG / DE), with English as the fallback. Your first word test starts in the same language. Preferences are saved locally. NL / ENG / DE in the top right then changes only the interface, without changing the test language, an ongoing test or results. A saved choice always takes precedence over the browser language. CSV column names remain the same across interface languages for compatibility.",
+      "de": "Beim ersten Besuch folgt die Oberfläche der ersten unterstützten Browsersprache (NL / ENG / DE); sonst wird Englisch verwendet. Der erste Worttest beginnt in derselben Sprache. Deine Einstellungen werden lokal gespeichert. NL / ENG / DE oben rechts ändert danach nur die Oberfläche, nicht die Testsprache, einen laufenden Test oder die Ergebnisse. Eine gespeicherte Auswahl hat immer Vorrang vor der Browsersprache. CSV-Spaltennamen bleiben in allen Oberflächensprachen gleich, damit Dateien kompatibel bleiben."
     },
     "progress.studyReference": {
       "nl": "Onderzoek: circa 52 WPM / 260 CPM. Alleen een globale referentie.",
