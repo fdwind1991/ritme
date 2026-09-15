@@ -6,7 +6,7 @@
  */
 'use strict';
 const RITME_DATA = {
-  "release": "3.2.3",
+  "release": "3.2.4",
   "lexicons": {
     "nl": {
       "name": "Nederlands",
