@@ -87,3 +87,8 @@
   .polish-record #result-wpm::after { display:none; }
 }
 @media print { .result-summary { color:inherit; } }
+
+/* remove focusoutline from results. */
+#results-view:focus {
+  outline: none;
+}
