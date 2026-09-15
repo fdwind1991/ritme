@@ -1,7 +1,7 @@
 /* Ritme · application logic. GPL-3.0; see LICENSE. Load data.js first. */
 'use strict';
 // Fail visibly on incomplete/mixed deployments instead of exposing raw i18n keys.
-const APP_RELEASE = '3.2.2';
+const APP_RELEASE = '3.2.3';
 if (typeof RITME_DATA === 'undefined' || RITME_DATA.release !== APP_RELEASE ||
     !RITME_DATA.codeCorpora?.python || !RITME_DATA.expandedLexicons?.nl ||
     !RITME_DATA.messages?.['code.label']?.nl) {
@@ -75,7 +75,21 @@ function writeLocal(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); storageAvailable=true; return true; }
   catch { storageAvailable = false; return false; }
 }
-const defaults = { duration:120, language:'nl', numbers:false, punctuation:true, capitals:false, size:28, theme:'light', mode:'words', numberLength:'mixed', numberKeyboard:'row', uiLanguage:'nl', practiceLesson:'adaptive', practiceKeyboard:true, practiceColors:true, practiceInfinite:false, practiceKeys:[], wordPractice:false, keyboardLayout:'us', standardTest:false, standardLanguage:'nl', speedUnit:'wpm', wordCorpus:'expanded', codeLanguage:'python', codeInfinite:false, codeGuide:false };
+/** Resolve the first supported browser preference, not a location or IP lookup.
+ * Used only as defaults. Valid saved interface and test languages win below.
+ */
+function preferredInterfaceLanguage(browser=globalThis.navigator){
+  const preferences=Array.isArray(browser?.languages)&&browser.languages.length
+    ? browser.languages : [browser?.language];
+  for(const tag of preferences){
+    if(typeof tag!=='string')continue;
+    const language=tag.trim().toLowerCase().split(/[-_]/)[0];
+    if(['nl','en','de'].includes(language))return language;
+  }
+  return 'en';
+}
+const browserLanguage=preferredInterfaceLanguage();
+const defaults = { duration:120, language:browserLanguage, numbers:false, punctuation:true, capitals:false, size:28, theme:'light', mode:'words', numberLength:'mixed', numberKeyboard:'row', uiLanguage:browserLanguage, practiceLesson:'adaptive', practiceKeyboard:true, practiceColors:true, practiceInfinite:false, practiceKeys:[], wordPractice:false, keyboardLayout:'us', standardTest:false, standardLanguage:browserLanguage, speedUnit:'wpm', wordCorpus:'expanded', codeLanguage:'python', codeInfinite:false, codeGuide:false };
 const savedSettings = readLocal(SETTINGS_KEY, {});
 const settings = {...defaults};
 if (savedSettings && typeof savedSettings === 'object') {
@@ -769,7 +783,9 @@ function showResult(result,preserveView=false){
   for(const id of ['result-back','result-history-btn','view-progress-btn','copy-btn'])$(id).hidden=temporary;
   // Do not persist weak-key targets derived from a private practice summary.
   if(temporary)$('training-note').hidden=true;
-  if(!preserveView){window.scrollTo({top:0,behavior:'instant'});$('again-btn').focus({preventScroll:true});}
+  // Focus a non-interactive result region. A trailing Space/Enter from typing
+  // must not activate 'Another test' after the timer or last custom-text letter.
+  if(!preserveView){window.scrollTo({top:0,behavior:'instant'});$('results-view').focus({preventScroll:true});}
 }
 
 /* ======================= Indicative speed benchmarks =======================
@@ -1724,6 +1740,11 @@ $('use-custom-btn').onclick=()=>{
   if(text.split(' ').some(w=>Array.from(w).length>30)){$('custom-error').textContent=translate("Een item is langer dan 30 tekens. Voeg daar een spatie toe voor goede weergave op kleine schermen.");$('custom-error').hidden=false;return;}
   customText=text;settings.language=$('custom-language').value;persistSettings();mode='custom';practiceKeys=[];$('custom-dialog').close();newTest();
 };
+// Absorb carry-over typing on the result region, but retain normal keyboard
+// activation after the user tabs to a button. Escape stays an explicit restart.
+$('results-view').addEventListener('keydown',event=>{
+  if(event.target===event.currentTarget && (event.key===' '||event.key==='Enter'))event.preventDefault();
+});
 $('typing-shell').addEventListener('click',focusTyping);$('focus-btn').onclick=focusTyping;
 $('capture').addEventListener('focus',()=>{$('focus-overlay').hidden=true;});
 $('capture').addEventListener('blur',()=>{if(session?.running && !$('test-view').hidden)$('focus-overlay').hidden=false;});

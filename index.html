@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
 <!--
-  Ritme — zelfstandige, persoonlijke editie v3.2.2 · code practice + expanded corpora + live practice feedback · naked CSS + NL/ENG/DE • 14 september 2026.
+  Ritme — zelfstandige, persoonlijke editie v3.2.3 · code practice + expanded corpora + live practice feedback · naked CSS + NL/ENG/DE • 14 september 2026.
   Nieuwe implementatie; geen code of assets van typespeedtest.com overgenomen.
   Concept en visuele basis: https://www.typespeedtest.com/ (aangeleverde screenshots).
   Zelfstandige uitvoering voor bredere functionaliteit; niet verbonden aan of
@@ -19,7 +19,7 @@
 <meta content="light dark" name="color-scheme"/>
 <meta name="description" content="Ritme: een rustige typetest met zes testtalen, een getallenmodus en persoonlijke voortgang. Zonder account; ook lokaal te gebruiken."/>
 <title>Ritme · vind je ritme</title>
-<meta name="ritme-release" content="3.2.2"/>
+<meta name="ritme-release" content="3.2.3"/>
 <script id="asset-base">
 (() => {
   const {protocol, pathname} = window.location;
@@ -31,8 +31,8 @@
 })();
 </script>
 <link rel="stylesheet" href="./styles.css?v=bcd226204b46"/>
-<script src="./data.js?v=5a2d1250bbdd" defer></script>
-<script src="./app.js?v=7b9caedee227" defer></script>
+<script src="./data.js?v=bb879d42abb5" defer></script>
+<script src="./app.js?v=7813406844e2" defer></script>
 </head>
 <body>
 <header class="topbar">
@@ -78,7 +78,7 @@
 </section>
 </div><p class="error-text" hidden="" id="fatal-error"></p>
 </section>
-<section aria-label="Testresultaat" class="results-view" data-i18n-aria-label="Testresultaat" hidden="" id="results-view">
+<section aria-label="Testresultaat" class="results-view" data-i18n-aria-label="Testresultaat" hidden="" id="results-view" tabindex="-1">
 <button class="result-back" data-i18n="← Voortgang" hidden="" id="result-back">← Voortgang</button>
 <div class="result-heading"><div><p class="result-overline" data-i18n="Test voltooid">Test voltooid</p><h1 data-i18n="Je ritme, in beeld.">Je ritme, in beeld.</h1></div><span class="result-insight" hidden="" id="result-insight"></span></div>
 <div class="result-card">

@@ -11,7 +11,7 @@ def check(name, condition, detail=None):
     assert condition,(name,detail)
 with sync_playwright() as p:
     browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH'),headless=True,args=['--no-sandbox'])
-    page=browser.new_page(viewport={'width':1440,'height':1000})
+    page=browser.new_page(locale='nl-NL',viewport={'width':1440,'height':1000})
     errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
     html=re.sub(r'<script[^>]*src=[^>]*></script>','',(root/'index.html').read_text())
     html=re.sub(r'<link[^>]*rel="stylesheet"[^>]*>','',html)
