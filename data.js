@@ -1450,6 +1450,11 @@ const RITME_DATA = {
       "en": "No typos. A flawless test.",
       "de": "Keine Tippfehler. Ein fehlerfreier Test."
     },
+    "result.sparse.note": {
+      "nl": "Weinig aanslagen voor een stabiele ritmemeting.",
+      "en": "Too few keystrokes for a stable rhythm reading.",
+      "de": "Zu wenige Anschläge für eine stabile Rhythmusmessung."
+    },
     "Balken: foutaantallen, niet de foutkans per toets. Beweeg over een balk voor fouten / pogingen.": {
       "nl": "Balken: foutaantallen, niet de foutkans per toets. Beweeg over een balk voor fouten / pogingen.",
       "en": "Bars show error counts, not error rates per key. Hover over a bar for errors / attempts.",
@@ -2404,6 +2409,16 @@ const RITME_DATA = {
       "nl": "Correcte tekens, omgerekend naar woorden per minuut.",
       "en": "Correct characters, converted to words per minute.",
       "de": "Korrekte Zeichen, umgerechnet in Wörter pro Minute."
+    },
+    "progress.speed.subtitle.cpm": {
+      "nl": "Correcte tekens per minuut.",
+      "en": "Correct characters per minute.",
+      "de": "Korrekte Zeichen pro Minute."
+    },
+    "progress.speed.subtitle.kph": {
+      "nl": "Correcte tekens per uur.",
+      "en": "Correct characters per hour.",
+      "de": "Korrekte Zeichen pro Stunde."
     },
     "Minder corrigeren, meer flow": {
       "nl": "Minder corrigeren, meer flow",

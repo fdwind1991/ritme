@@ -106,22 +106,21 @@ try:
       page.select_option('#code-language',language)
       for width in [320,390,768,1440]:
         page.set_viewport_size({'width':width,'height':844});page.wait_for_timeout(70)
-        check(f'Code only uses source line breaks {language}/{width}',page.evaluate("[...$('word-track').children].every(el=>getComputedStyle(el).whiteSpace==='pre')"))
+        check(f'Code wraps inside viewport {language}/{width}',page.evaluate("[...$('word-track').children].every(el=>getComputedStyle(el).whiteSpace==='pre-wrap'"))
         check(f'Code contained in viewport {language}/{width}',page.evaluate('document.documentElement.scrollWidth<=innerWidth'))
     # Fixed long line fixture: no application source/corpora or scores changed.
     page.set_viewport_size({'width':390,'height':844});page.select_option('#code-language','python')
     page.evaluate("""()=>{settings.codeInfinite=true;newTest();session.words=[];session.generatedWordCount=0;session.index=0;
       session.addWords(['print("A source line remains a single line even when the mobile screen is narrow.")','    return value;','','done()']);
       nodes=[];$('word-track').replaceChildren();appendNodes();for(let i=0;i<nodes.length;i++)renderWord(i);scrollToCaret();} """)
-    check('Long line physically does not wrap',page.evaluate('Math.abs(nodes[0].chars[0].getBoundingClientRect().top-nodes[0].chars.at(-1).getBoundingClientRect().top)<1'))
-    check('Horizontal scrolling available',page.evaluate("$('typing-viewport').scrollWidth>$('typing-viewport').clientWidth"))
+    check('Long line wraps inside viewport',page.evaluate('Math.abs(nodes[0].chars[0].getBoundingClientRect().top-nodes[0].chars.at(-1).getBoundingClientRect().top)>1'))
+    check('Horizontal scrolling unavailable',page.evaluate("$('typing-viewport').scrollWidth<=$('typing-viewport').clientWidth"))
     page.screenshot(path=str(OUT/'code-mobile.png'),full_page=True)
     page.locator('#capture').focus();text=page.evaluate('session.current.text');page.keyboard.type(text)
-    check('Caret scrolls horizontally',page.evaluate("$('typing-viewport').scrollLeft>0"))
-    check('Caret remains visible',page.evaluate("(()=>{const a=$('typing-viewport').getBoundingClientRect(),b=nodes[session.index].gap.getBoundingClientRect();return b.left>=a.left&&b.right<=a.right;})()"))
-    check('Gutter stays visible during horizontal scroll',page.evaluate("Math.abs(nodes[0].el.querySelector('.code-line-number').getBoundingClientRect().left-$('typing-viewport').getBoundingClientRect().left)<5"))
+    check('Caret remains inside viewport',page.evaluate("(()=>{const a=$('typing-viewport').getBoundingClientRect(),b=nodes[session.index].gap.getBoundingClientRect();return b.left>=a.left&&b.right<=a.right;})()"))
+    check('Code remains at horizontal origin',page.evaluate("$('typing-viewport').scrollLeft===0"))
     page.keyboard.press('Enter');check('Physical Enter once',page.evaluate('session.index===1'))
-    check('Enter resets horizontal scroll',page.evaluate("$('typing-viewport').scrollLeft===0"))
+    check('Enter keeps horizontal origin',page.evaluate("$('typing-viewport').scrollLeft===0"))
     page.keyboard.type('    ');check('Indent spaces each counted',page.evaluate('session.current.input.length===4'))
     page.keyboard.type('return value;');page.keyboard.press('Enter');page.keyboard.press('Enter')
     check('Blank line advances once',page.evaluate('session.index===3'))

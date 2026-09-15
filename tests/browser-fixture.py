@@ -23,6 +23,10 @@ with sync_playwright() as p:
     page.wait_for_timeout(100)
     check('Initialises extended Dutch word test',page.evaluate("session.config.wordCorpusVersion==='ritme-expanded-v1'&&session.config.language==='nl'"))
     check('No fatal startup message',not page.locator('#fatal-error').is_visible())
+    check('Desktop hides mobile duration controls',page.evaluate("getComputedStyle(document.querySelector('.mobile-duration-group')).display==='none'"))
+    page.set_viewport_size({'width':390,'height':844})
+    check('Mobile shows one duration control row',page.evaluate("getComputedStyle(document.querySelector('.mobile-duration-group')).display==='flex' && getComputedStyle(document.querySelector('.duration-group')).display==='none'"))
+    page.set_viewport_size({'width':1440,'height':1000})
     # Capture files in memory, not browser downloads. Scope is unchanged runtime exports.
     page.evaluate("downloadFile=(text,name,type)=>{window.lastDownload={text,name,type};}")
     for language in ['python','html','css','javascript']:

@@ -14,7 +14,8 @@ test('duration changes reuse the existing prompt without rolling it out',()=>{
 
 test('capital changes transform the existing prompt instead of sampling new words',()=>{
   assert.match(app,/function transformPromptCapitalization\(words,config\)/);
-  assert.match(app,/canReusePrompt&&promptMode==='capitals'&&usesCapitalization\(config\)/);
+  assert.match(app,/if\(!usesCapitalization\(config\)\)return normalized/);
+  assert.match(app,/canReusePrompt&&promptMode==='capitals'\s*\n?\s*\?/);
   assert.match(app,/newTest\(\{promptMode:'capitals'\}\)/);
   assert.match(app,/toLocaleLowerCase\(config\.language\)/);
 });

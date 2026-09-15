@@ -112,10 +112,9 @@ with sync_playwright() as p:
     aligned('New code track restores shared underline')
     line=page.evaluate('session.current.text')
     page.keyboard.type(line[:85])
-    aligned('Long code line follows horizontal scrolling')
-    check('Code viewport scrolled horizontally',page.evaluate("$('typing-viewport').scrollLeft>0"))
-    page.evaluate("$('typing-viewport').scrollLeft-=20")
-    aligned('Manual horizontal scroll carries the underline')
+    aligned('Long code line wraps inside the viewport')
+    check('Code viewport never overflows horizontally',page.evaluate("$('typing-viewport').scrollWidth<=$('typing-viewport').clientWidth"))
+    check('Code viewport stays at horizontal origin',page.evaluate("$('typing-viewport').scrollLeft===0"))
     # Finger color and theme are taken from the existing underline styles.
     page.evaluate("mode='practice';settings.practiceLesson='home';settings.practiceInfinite=true;newTest()")
     aligned('Practice cursor',330)

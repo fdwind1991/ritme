@@ -25,3 +25,10 @@ test('text rolling respects reduced motion and cleans up old layers',()=>{
   assert.match(styles,/text-roll-out \.42s/);
   assert.match(styles,/text-roll-in \.42s/);
 });
+
+test('capital changes use a short fade without text rolling',()=>{
+  assert.match(app,/function playCapitalTransition\(shouldAnimate\)/);
+  assert.match(app,/playCapitalTransition\(wasTypingView&&promptMode==='capitals'\)/);
+  assert.match(styles,/\.word-track\.capital-transition \{ animation:capital-transition \.24s/);
+  assert.match(styles,/@keyframes capital-transition/);
+});

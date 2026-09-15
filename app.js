@@ -54,6 +54,7 @@ const STORAGE_KEY = 'folkert-type-test-v1';
 const SETTINGS_KEY = 'folkert-type-settings-v1';
 const RECORDS_KEY = 'folkert-type-records-v1';
 const CODE_TAB = ' '.repeat(4);
+const MAX_VISIBLE_EXTRAS = 256;
 let entropyCursor = 0;
 /** Fresh independent cryptographic input; the public build salt is not a PRNG seed. */
 function secureInt(max) {
@@ -312,7 +313,7 @@ function setInterfaceLanguage(language){
   applyInterface();
   if(session){
     updateControls();updatePersonalBest();
-    updateAccessiblePrompt();
+    updateAccessiblePrompt(true);
   }
   if(!$('results-view').hidden&&currentResult)showResult(currentResult,true);
   if(!$('progress-view').hidden)renderHistory();
@@ -339,8 +340,9 @@ function rememberRecord(result){
   const key=profileKey(result),best=Number(records[key]);
   if(!Number.isFinite(best)||result.wpm>best){records[key]=result.wpm;persistRecords();}
 }
-function updateAccessiblePrompt(){
-  if(!session)return;
+function updateAccessiblePrompt(force=false){
+  if(!session||(!force&&accessiblePromptStart===session.index))return;
+  accessiblePromptStart=session.index;
   const words=session.words.slice(session.index,session.index+35);
   const text=isCode(session.config)?words.map(word=>word.text).join('\n'):words.map(word=>word.text).join(' ');
   $('accessible-prompt').textContent=translate('Over te typen: ')+text;
@@ -413,8 +415,10 @@ function promptShapeKey(config){
   });
 }
 function transformPromptCapitalization(words,config){
+  const normalized=words.map(text=>String(text).toLocaleLowerCase(config.language));
+  if(!usesCapitalization(config))return normalized;
   const options={...config,capitals:true},state={capitalizeNext:true};
-  return words.map(text=>applyWordCapitalization(String(text).toLocaleLowerCase(config.language),config.language,options,state));
+  return normalized.map(text=>applyWordCapitalization(text,config.language,options,state));
 }
 function usesCapitalization(config){
   return config.capitals===true && (config.mode==='words' || (config.mode==='practice' && !guidedDrill(config)));
@@ -650,9 +654,11 @@ class CodeTypingSession extends TypingSession {
 
 /* ========================= App state and rendering ======================== */
 let session=null, currentResult=null, customText='', practiceKeys=[...(settings.practiceKeys||[])], mode=settings.mode;
+let accessiblePromptStart=-1;
 let progressMetric='wpm',progressFilterInitialized=false;
 let nodes=[], timerHandle=null, lastUiTime=0, composing=false, confirmAction=null;
 let textRollCleanup=null;
+let capitalTransitionCleanup=null;
 let toastTimer=null, reenterFocus=true;
 const shownSeries={burst:true,raw:true,net:true,fixed:true,wrong:true};
 function toast(message){$('toast').textContent=message;$('toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),3200);}
@@ -750,7 +756,7 @@ function renderWord(index){
   }
   n.extras.replaceChildren();
   const extraInput=w.input.slice(w.chars.length);
-  const visibleExtras=extraInput.slice(-256);
+  const visibleExtras=extraInput.slice(-MAX_VISIBLE_EXTRAS);
   for(const p of visibleExtras){const s=document.createElement('span');s.className='extra';s.textContent=p.ch;n.extras.append(s);}
   n.gap.className='gap'+(w.submitted?(w.space?.good?' correct':' incorrect'):'')+(index===session.index && w.input.length>=w.chars.length?' current':'');
 }
@@ -772,13 +778,7 @@ function scrollToCaret(){
   track.style.setProperty('--scroll-y',-offset+'px');
   if(caret){
     if(code){
-      const bounds=viewport.getBoundingClientRect(),box=caret.getBoundingClientRect();
       const gutter=node.el.querySelector('.code-line-number')?.offsetWidth||36;
-      // Native horizontal scrolling: source lines never visually become new lines.
-      if(box.right>bounds.right-12)viewport.scrollLeft+=box.right-bounds.right+12;
-      else if(box.left<bounds.left+gutter+8)viewport.scrollLeft=Math.max(0,viewport.scrollLeft+box.left-bounds.left-gutter-8);
-      if(session.current.input.length===0)viewport.scrollLeft=0;
-      // Anchor the native input close to the visible line for mobile focus handling.
       $('capture').style.top=Math.min(viewport.clientHeight-20,Math.max(0,node.el.offsetTop-offset))+'px';
       $('capture').style.left=Math.min(viewport.clientWidth-20,Math.max(0,gutter+8))+'px';
     }
@@ -832,6 +832,24 @@ function prepareTextRoll(shouldAnimate){
   textRollCleanup=finish;
   window.setTimeout(finish,520);
 }
+function playCapitalTransition(shouldAnimate){
+  const track=$('word-track');
+  capitalTransitionCleanup?.();
+  track.classList.remove('capital-transition');
+  if(!shouldAnimate||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+  void track.offsetWidth;
+  track.classList.add('capital-transition');
+  let finished=false;
+  const finish=()=>{
+    if(finished)return;
+    finished=true;
+    track.classList.remove('capital-transition');
+    capitalTransitionCleanup=null;
+  };
+  track.addEventListener('animationend',finish,{once:true});
+  capitalTransitionCleanup=finish;
+  window.setTimeout(finish,320);
+}
 function newTest({promptMode='fresh'}={}){
   const wasTypingView=!$('test-view').hidden;
   const previousConfig=session?.config;
@@ -844,6 +862,7 @@ function newTest({promptMode='fresh'}={}){
   prepareTextRoll(wasTypingView&&promptMode==='fresh');
   $('word-track').replaceChildren();$('word-track').style.setProperty('--scroll-y','0px');nodes=[];
   $('test-time-fill').style.transform='scaleX(0)';
+  accessiblePromptStart=-1;
   try{
     if(mode==='custom'&&!customText)mode='words';
     if(mode==='practice'&&settings.practiceLesson==='weak'&&!practiceKeys.length)settings.practiceLesson='words';
@@ -873,11 +892,11 @@ function newTest({promptMode='fresh'}={}){
     const canReusePrompt=previousWords?.length&&previousConfig&&promptShapeKey(previousConfig)===promptShapeKey(config);
     const words=canReusePrompt&&promptMode==='same'
       ? previousWords
-      : canReusePrompt&&promptMode==='capitals'&&usesCapitalization(config)
+      : canReusePrompt&&promptMode==='capitals'
         ? transformPromptCapitalization(previousWords,config)
         : mode==='custom'?customText.split(' '):makePrompt(config,isAdaptive(config)?48:180,0,promptState);
-    session=new (isCode(config)?CodeTypingSession:TypingSession)(config,words,mode==='custom',promptState);appendNodes();renderWord(0);
-    updateAccessiblePrompt();
+    session=new (isCode(config)?CodeTypingSession:TypingSession)(config,words,mode==='custom',promptState);appendNodes();renderWord(0);playCapitalTransition(wasTypingView&&promptMode==='capitals');
+    updateAccessiblePrompt(true);
     for(const id of ['live-dot','live-wpm','stop-btn'])$(id).hidden=true;
     if(['words','numbers','practice','code'].includes(mode)){settings.mode=mode;if(mode!=='numbers'&&mode!=='code')settings.wordPractice=mode==='practice';persistSettings();}
     updateControls();updatePersonalBest();window.scrollTo({top:0,behavior:'instant'});requestAnimationFrame(focusTyping);
@@ -1019,6 +1038,8 @@ function showResult(result,preserveView=false){
   $('result-raw').textContent=Math.round(result.raw);$('result-consistency').textContent=result.consistency===null?'—':Math.round(result.consistency)+'%';
   $('result-cpm').textContent=Math.round(result.cpm);$('result-kph').textContent=resultKPH(result).toLocaleString(uiLocale());$('result-typos').textContent=result.typos;$('result-uncorrected').textContent=result.uncorrected;
   $('result-keystroke').textContent=fmtPercent(result.keystrokeAccuracy);$('result-corrections').textContent=translate('result.corrections',{corrected:result.corrected,typos:result.typos});
+  $('result-sample-note').hidden=!(Number(result.attempts||0)<20 && Number(result.duration||0)>=5);
+  $('weak-spots').open=!(window.matchMedia?.('(max-width:600px)').matches);
   $('chart-wrap').hidden=!result.samples.length;$('result-legend').hidden=!result.samples.length;$('result-chart-empty').hidden=temporary||!!result.samples.length;
   $('weak-spots').hidden=!!result.summaryOnly&&!Object.keys(result.keys).length;
   $('practice-result-note').hidden=result.practiceGuideVersion!==1;
@@ -1345,7 +1366,12 @@ function renderHistory(){
   refreshCustomSelects();
   const rows=historySelection(),eligible=rows.filter(isCompleteResult),plotted=eligible.filter(r=>metricValue(r)!==null);
   const values=plotted.map(metricValue),average=mean(values),best=values.length?Math.max(...values):null;
-  const labels={wpm:[translate("Je snelheid in beeld"),translate("Correcte tekens, omgerekend naar woorden per minuut.")],keystrokeAccuracy:[translate("Minder corrigeren, meer flow"),translate("Aanslagnauwkeurigheid, dus inclusief herstelde fouten.")],consistency:[translate("Je ritme in beeld"),translate("Hoe gelijkmatig je typt tijdens een test.")]};
+  const speedSubtitle=settings.speedUnit==='cpm'
+    ?translate('progress.speed.subtitle.cpm')
+    :settings.speedUnit==='kph'
+      ?translate('progress.speed.subtitle.kph')
+      :translate("Correcte tekens, omgerekend naar woorden per minuut.");
+  const labels={wpm:[translate("Je snelheid in beeld"),speedSubtitle],keystrokeAccuracy:[translate("Minder corrigeren, meer flow"),translate("Aanslagnauwkeurigheid, dus inclusief herstelde fouten.")],consistency:[translate("Je ritme in beeld"),translate("Hoe gelijkmatig je typt tijdens een test.")]};
   $('speed-unit').value=settings.speedUnit;$('speed-unit-wrap').hidden=progressMetric!=='wpm';
   $('progress-chart-title').textContent=labels[progressMetric][0];$('progress-chart-subtitle').textContent=labels[progressMetric][1];
   $('history-last').textContent=metricDisplay(values[0]);$('history-median').textContent=metricDisplay(average);$('history-best').textContent=metricDisplay(best);$('history-count').textContent=eligible.length;

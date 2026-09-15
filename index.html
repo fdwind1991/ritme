@@ -20,6 +20,7 @@
 <meta name="description" content="Ritme: een rustige typetest met zes testtalen, een getallenmodus en persoonlijke voortgang. Zonder account; ook lokaal te gebruiken."/>
 <title>Ritme · vind je ritme</title>
 <meta name="ritme-release" content="3.2.4"/>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml"/>
 <script id="asset-base">
 (() => {
   const {protocol, pathname} = window.location;
@@ -30,10 +31,10 @@
   }
 })();
 </script>
-<link rel="stylesheet" href="./styles.css?v=c539c55302d2"/>
+<link rel="stylesheet" href="./styles.css?v=0f28a6acffe5"/>
 <link rel="stylesheet" href="./polish.css?v=0b00742476fa"/>
-<script src="./data.js?v=c81f31fc66e8" defer></script>
-<script src="./app.js?v=393fe3741ee4" defer></script>
+<script src="./data.js?v=f2205327c71e" defer></script>
+<script src="./app.js?v=52e613687d1d" defer></script>
 <script src="./polish.js?v=173b9385a153" defer></script>
 </head>
 <body>
@@ -73,7 +74,7 @@
 </section></div>
 <div aria-hidden="true" class="test-time-track"><div class="test-time-fill" id="test-time-fill"></div></div>
 <div class="typing-stage"><div class="live-line" id="live-line"><span class="stage-label" id="stage-label">Nederlands · losse woorden</span><div class="live-metrics"><span id="timer">2:00</span><span class="dot" hidden="" id="live-dot">·</span><span hidden="" id="live-wpm">0 wpm</span><button class="live-stop" data-i18n="stop" data-i18n-title="Afronden met de verstreken tijd" hidden="" id="stop-btn" title="Afronden met de verstreken tijd">stop</button></div></div>
-<div class="typing-shell" id="typing-shell"><span class="caps-warning" data-i18n="caps lock" hidden="" id="caps-warning">caps lock</span><div aria-hidden="true" class="typing-viewport" id="typing-viewport"><div class="word-track" id="word-track"></div></div><textarea aria-describedby="accessible-prompt typing-hint" aria-label="Typ de getoonde tekst. De test begint bij je eerste aanslag." autocapitalize="off" autocomplete="off" autocorrect="off" class="capture" data-enable-grammarly="false" data-gramm="false" data-i18n-aria-label="Typ de getoonde tekst. De test begint bij je eerste aanslag." id="capture" inputmode="text" rows="1" spellcheck="false"></textarea><div class="screen-reader-only" id="accessible-prompt"></div><div class="focus-overlay" hidden="" id="focus-overlay"><button id="focus-btn"><span data-i18n="Klik om verder te typen">Klik om verder te typen</span><small data-i18n="De timer loopt door." id="focus-note">De timer loopt door.</small></button></div></div></div>
+<div class="typing-shell" id="typing-shell"><span class="caps-warning" data-i18n="caps lock" hidden="" id="caps-warning">caps lock</span><div aria-hidden="true" class="typing-viewport" id="typing-viewport"><div class="word-track" id="word-track"></div></div><textarea aria-describedby="accessible-prompt typing-hint" aria-label="Typ de getoonde tekst. De test begint bij je eerste aanslag." autocapitalize="off" autocomplete="off" autocorrect="off" class="capture" data-enable-grammarly="false" data-gramm="false" data-i18n-aria-label="Typ de getoonde tekst. De test begint bij je eerste aanslag." id="capture" inputmode="text" rows="1" spellcheck="false"></textarea><div aria-atomic="true" aria-live="polite" class="screen-reader-only" id="accessible-prompt"></div><div class="focus-overlay" hidden="" id="focus-overlay"><button id="focus-btn"><span data-i18n="Klik om verder te typen">Klik om verder te typen</span><small data-i18n="De timer loopt door." id="focus-note">De timer loopt door.</small></button></div></div></div>
 <section aria-label="Aanslaghulp · US QWERTY" class="practice-guide" data-i18n-aria-label="practice.guide" hidden="" id="practice-guide">
 <div aria-hidden="true" class="coach-target" id="coach-target"><span class="target-key" id="coach-target-key"></span><span class="target-finger" id="coach-target-finger"></span><span class="target-modifier" id="coach-target-shift"></span><span class="target-issue" id="coach-target-issue"></span></div>
 <div aria-atomic="true" aria-live="polite" class="screen-reader-only" id="coach-accessible"></div>
@@ -97,6 +98,7 @@
 <div class="mini-accuracy"><span><span data-i18n="Aanslagnauwkeurigheid">Aanslagnauwkeurigheid</span> <b id="result-keystroke">100.0%</b></span><span id="result-corrections">0 correcties</span></div>
 <p class="practice-result-note" hidden="" id="practice-result-note"></p>
 <p class="practice-session-detail" hidden="" id="practice-session-detail"></p>
+<p class="result-sample-note" data-i18n="result.sparse.note" hidden="" id="result-sample-note">Weinig aanslagen voor een stabiele ritmemeting.</p>
 <section aria-label="Snelheidsbenchmark" class="benchmark" data-i18n-aria-label="Snelheidsbenchmark" hidden="" id="result-benchmark"></section>
 <div class="chart-wrap" id="chart-wrap"><svg aria-label="Typesnelheid en fouten gedurende de test" data-i18n-aria-label="Typesnelheid en fouten gedurende de test" id="chart" role="img" viewbox="0 0 680 228"></svg><div class="chart-tooltip" hidden="" id="chart-tooltip"></div></div>
 <p class="chart-empty" data-i18n="Dit resultaat is uit CSV geïmporteerd. De scores zijn bewaard; een grafiek per seconde zat niet in die export." hidden="" id="result-chart-empty">Dit resultaat is uit CSV geïmporteerd. De scores zijn bewaard; een grafiek per seconde zat niet in die export.</p>

@@ -25,3 +25,10 @@ test('progress bands use one comparable profile without requiring word mode',()=
   assert.match(data,/"benchmark\.indicative"/);
   assert.match(data,/"benchmark\.comparable\.mode\.one"/);
 });
+
+test('progress speed subtitle follows the selected unit',()=>{
+  assert.match(app,/settings\.speedUnit==='cpm'\s*\n\s*\?translate\('progress\.speed\.subtitle\.cpm'\)/);
+  assert.match(app,/settings\.speedUnit==='kph'\s*\n\s*\?translate\('progress\.speed\.subtitle\.kph'\)/);
+  assert.match(data,/"progress\.speed\.subtitle\.cpm"/);
+  assert.match(data,/"progress\.speed\.subtitle\.kph"/);
+});

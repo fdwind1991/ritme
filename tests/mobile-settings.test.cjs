@@ -26,3 +26,8 @@ test('mobile settings collapse uses only a minimal arrow',()=>{
   assert.match(styles,/\.mobile-settings\.is-collapsed \.mobile-settings-content\s*\{\s*display:none;\s*\}/);
   assert.match(styles,/\.mobile-settings-content\s*\{\s*display:contents;\s*\}/);
 });
+
+test('mobile duration controls are hidden from desktop and visible on mobile',()=>{
+  assert.match(styles,/\.control-group\.mobile-duration-group\s*\{\s*display:none;\s*\}/);
+  assert.match(styles,/@media\(max-width:600px\)[\s\S]*\.control-group\.mobile-duration-group\s*\{\s*display:flex;/);
+});
