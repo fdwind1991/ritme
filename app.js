@@ -1,7 +1,7 @@
 /* Ritme · application logic. GPL-3.0; see LICENSE. Load data.js first. */
 'use strict';
 // Fail visibly on incomplete/mixed deployments instead of exposing raw i18n keys.
-const APP_RELEASE = '3.2.3';
+const APP_RELEASE = '3.2.4';
 if (typeof RITME_DATA === 'undefined' || RITME_DATA.release !== APP_RELEASE ||
     !RITME_DATA.codeCorpora?.python || !RITME_DATA.expandedLexicons?.nl ||
     !RITME_DATA.messages?.['code.label']?.nl) {
